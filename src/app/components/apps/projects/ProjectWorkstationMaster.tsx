@@ -2352,25 +2352,25 @@ export default function ProjectWorkstationMaster({
               </div>
             }
             actions={
-              <>
-                {/* Mobile View: 1 Primary CTA + 1 DropdownMenu for all secondary actions */}
-                <div className="grid w-full grid-cols-2 gap-1.5 sm:hidden print:hidden">
+              <div className="w-full md:w-auto">
+                {/* Mobile / Compact View (< md): 1 Primary CTA + 1 DropdownMenu */}
+                <div className="grid w-full grid-cols-2 gap-2 md:hidden print:hidden">
                   {canSubmitDailyProgressRole ? (
                     <Button
                       type="button"
                       size="sm"
                       onClick={() => openDailyProgressForProject(null)}
-                      className="gap-1.5 truncate"
+                      className="gap-1.5 truncate shadow-xs"
                     >
                       <Camera className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="truncate">Daily Report</span>
+                      <span className="truncate">Input Daily</span>
                     </Button>
                   ) : isProjectManager ? (
                     <Button
                       type="button"
                       size="sm"
                       onClick={() => setNewProjectOpen(true)}
-                      className="gap-1.5 truncate"
+                      className="gap-1.5 truncate shadow-xs"
                     >
                       <Plus className="size-4 shrink-0" aria-hidden="true" />
                       <span className="truncate">Proyek Baru</span>
@@ -2401,26 +2401,26 @@ export default function ProjectWorkstationMaster({
                         <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-56">
+                    <DropdownMenuContent align="end" className="min-w-60">
                       <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
-                        Aksi Proyek &amp; Laporan
+                        Aksi Proyek &amp; Lapangan
                       </DropdownMenuLabel>
                       {canSubmitDailyProgressRole && (
                         <DropdownMenuItem onSelect={() => openDailyProgressForProject(null)}>
-                          <Camera className="size-4" aria-hidden="true" />
-                          Input Daily Report
+                          <Camera className="size-4 text-primary" aria-hidden="true" />
+                          <span>Input Daily Report</span>
                         </DropdownMenuItem>
                       )}
                       {(canSubmitDailyProgressRole || isProjectManager) && (
                         <DropdownMenuItem onSelect={() => openSendProgressForProject(null)}>
-                          <Send className="size-4" aria-hidden="true" />
-                          Kirim Progres Lapangan
+                          <Send className="size-4 text-emerald-600" aria-hidden="true" />
+                          <span>Kirim Progres Lapangan</span>
                         </DropdownMenuItem>
                       )}
                       {isProjectManager && (
                         <DropdownMenuItem onSelect={() => setNewProjectOpen(true)}>
-                          <Plus className="size-4" aria-hidden="true" />
-                          Tambah Proyek Baru
+                          <Plus className="size-4 text-primary" aria-hidden="true" />
+                          <span>Tambah Proyek Baru</span>
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
@@ -2429,11 +2429,11 @@ export default function ProjectWorkstationMaster({
                       </DropdownMenuLabel>
                       <DropdownMenuItem onSelect={() => setShowWorkflowGuide((prev) => !prev)}>
                         <FileText className="size-4" aria-hidden="true" />
-                        {showWorkflowGuide ? "Tutup Alur 4 Tahap" : "Buka Alur 4 Tahap"}
+                        <span>{showWorkflowGuide ? "Tutup Panduan 4 Tahap" : "Buka Panduan 4 Tahap"}</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setShowPicChart((prev) => !prev)}>
                         <ChartSpline className="size-4 text-primary" aria-hidden="true" />
-                        {showPicChart ? "Sembunyikan Grafik PIC" : "Tampilkan Grafik PIC"}
+                        <span>{showPicChart ? "Sembunyikan Grafik PIC" : "Tampilkan Grafik PIC"}</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => {
@@ -2445,11 +2445,11 @@ export default function ProjectWorkstationMaster({
                         }}
                       >
                         <MapPinned className="size-4 text-sky-500" aria-hidden="true" />
-                        Buka Peta GIS
+                        <span>Buka Peta GIS</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setProjectViewMode("dinas")}>
                         <LayoutTemplate className="size-4" aria-hidden="true" />
-                        Rekap Portofolio &amp; Dinas
+                        <span>Rekap Portofolio &amp; Dinas</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
@@ -2463,8 +2463,8 @@ export default function ProjectWorkstationMaster({
                           )
                         }
                       >
-                        <FileSpreadsheet className="size-4" aria-hidden="true" />
-                        Export Excel (.xlsx)
+                        <FileSpreadsheet className="size-4 text-emerald-600" aria-hidden="true" />
+                        <span>Export Excel (.xlsx)</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() =>
@@ -2474,8 +2474,8 @@ export default function ProjectWorkstationMaster({
                           )
                         }
                       >
-                        <FileText className="size-4" aria-hidden="true" />
-                        Export PDF Resmi
+                        <FileText className="size-4 text-rose-600" aria-hidden="true" />
+                        <span>Export PDF Resmi</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() =>
@@ -2486,100 +2486,11 @@ export default function ProjectWorkstationMaster({
                         }
                       >
                         <Download className="size-4" aria-hidden="true" />
-                        Export CSV (.csv)
+                        <span>Export CSV (.csv)</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => handlePrintPortfolio()}>
                         <Printer className="size-4" aria-hidden="true" />
-                        Cetak Tabel Portofolio (Pratinjau Cetak)
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Desktop View: Full horizontal button bar intact */}
-                <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-2 print:hidden">
-                  {canSubmitDailyProgressRole && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => openDailyProgressForProject(null)}
-                      className="gap-1.5"
-                    >
-                      <Camera className="size-4" aria-hidden="true" />
-                      <span>Input Daily Report</span>
-                    </Button>
-                  )}
-                  {(canSubmitDailyProgressRole || isProjectManager) && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openSendProgressForProject(null)}
-                      className="gap-1.5"
-                    >
-                      <Send className="size-3.5" aria-hidden="true" />
-                      <span>Kirim Progres</span>
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                      >
-                        <FileText className="size-3.5" aria-hidden="true" />
-                        <span>Laporan Otomatis</span>
-                        <ChevronDown className="size-3.5" aria-hidden="true" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-60">
-                      <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
-                        Portofolio Proyek (Sesuai Filter)
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          void downloadUrlWithToast(
-                            getExportHref("xlsx"),
-                            "portofolio-proyek.xlsx",
-                          )
-                        }
-                      >
-                        <FileSpreadsheet aria-hidden="true" />
-                        Portofolio Excel (.xlsx)
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          void downloadUrlWithToast(
-                            getExportHref("pdf"),
-                            "portofolio-proyek.pdf",
-                          )
-                        }
-                      >
-                        <FileText aria-hidden="true" />
-                        Portofolio PDF Resmi
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          void downloadUrlWithToast(
-                            getExportHref("csv"),
-                            "portofolio-proyek.csv",
-                          )
-                        }
-                      >
-                        <Download aria-hidden="true" />
-                        Export CSV (.csv)
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => handlePrintPortfolio()}>
-                        <Printer aria-hidden="true" />
-                        Cetak Tabel Portofolio (Pratinjau Cetak)
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => setProjectViewMode("dinas")}
-                      >
-                        <LayoutTemplate aria-hidden="true" />
-                        Buka Rekap Portofolio &amp; Dinas
+                        <span>Cetak Tabel Portofolio</span>
                       </DropdownMenuItem>
                       {selectedProjectIds.length === 1 && (() => {
                         const chosen = projects.find(
@@ -2600,8 +2511,8 @@ export default function ProjectWorkstationMaster({
                                 )
                               }
                             >
-                              <FileText aria-hidden="true" />
-                              PDF Harian
+                              <FileText className="size-4 text-rose-600" aria-hidden="true" />
+                              <span>PDF Harian</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onSelect={() =>
@@ -2611,8 +2522,8 @@ export default function ProjectWorkstationMaster({
                                 )
                               }
                             >
-                              <FileText aria-hidden="true" />
-                              PDF Progres &amp; Kurva-S
+                              <FileText className="size-4 text-rose-600" aria-hidden="true" />
+                              <span>PDF Progres &amp; Kurva-S</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onSelect={() =>
@@ -2622,8 +2533,8 @@ export default function ProjectWorkstationMaster({
                                 )
                               }
                             >
-                              <FileSpreadsheet aria-hidden="true" />
-                              Excel Progres &amp; Kurva-S
+                              <FileSpreadsheet className="size-4 text-emerald-600" aria-hidden="true" />
+                              <span>Excel Progres &amp; Kurva-S</span>
                             </DropdownMenuItem>
                             {canViewFinancials && (
                               <>
@@ -2635,8 +2546,8 @@ export default function ProjectWorkstationMaster({
                                     )
                                   }
                                 >
-                                  <FileText aria-hidden="true" />
-                                  PDF Keuangan RAB/RAP
+                                  <FileText className="size-4 text-rose-600" aria-hidden="true" />
+                                  <span>PDF Keuangan RAB/RAP</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onSelect={() =>
@@ -2646,8 +2557,8 @@ export default function ProjectWorkstationMaster({
                                     )
                                   }
                                 >
-                                  <FileSpreadsheet aria-hidden="true" />
-                                  Excel Keuangan RAB/RAP
+                                  <FileSpreadsheet className="size-4 text-emerald-600" aria-hidden="true" />
+                                  <span>Excel Keuangan RAB/RAP</span>
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -2656,66 +2567,238 @@ export default function ProjectWorkstationMaster({
                       })()}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowWorkflowGuide((prev) => !prev)}
-                    className="gap-1.5"
-                  >
-                    <span>Alur 4 Tahap</span>
-                    {showWorkflowGuide ? (
-                      <ChevronUp className="size-3.5" aria-hidden="true" />
-                    ) : (
-                      <ChevronDown className="size-3.5" aria-hidden="true" />
+                </div>
+
+                {/* Desktop & Tablet View (md:): Clean 2-Row Stack */}
+                <div className="hidden md:flex md:flex-col md:items-end md:gap-2 print:hidden">
+                  {/* Baris 1: Aksi Utama & Operasional */}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {canSubmitDailyProgressRole && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => openDailyProgressForProject(null)}
+                        className="gap-1.5 shadow-xs"
+                      >
+                        <Camera className="size-4" aria-hidden="true" />
+                        <span>Input Daily Report</span>
+                      </Button>
                     )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPicChart((prev) => !prev)}
-                    className="gap-1.5"
-                  >
-                    <ChartSpline
-                      className="size-4 text-primary"
-                      aria-hidden="true"
-                    />
-                    <span>Grafik PIC</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const projectId =
-                        surveyProjectId || surveyProjects[0]?.id || "none";
-                      router.push(
-                        `/apps/projects?section=surveys&view=map&projectId=${encodeURIComponent(projectId)}`,
-                      );
-                    }}
-                    className="gap-1.5"
-                  >
-                    <MapPinned
-                      className="size-4 text-sky-500"
-                      aria-hidden="true"
-                    />
-                    <span>Peta GIS</span>
-                  </Button>
-                  {isProjectManager && (
+                    {(canSubmitDailyProgressRole || isProjectManager) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSendProgressForProject(null)}
+                        className="gap-1.5"
+                      >
+                        <Send className="size-3.5" aria-hidden="true" />
+                        <span>Kirim Progres</span>
+                      </Button>
+                    )}
+                    {isProjectManager && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setNewProjectOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Plus className="size-4" aria-hidden="true" />
+                        <span>Proyek Baru</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Baris 2: Laporan, Alat & Visualisasi */}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                        >
+                          <FileText className="size-3.5" aria-hidden="true" />
+                          <span>Laporan Otomatis</span>
+                          <ChevronDown className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-60">
+                        <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                          Portofolio Proyek (Sesuai Filter)
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void downloadUrlWithToast(
+                              getExportHref("xlsx"),
+                              "portofolio-proyek.xlsx",
+                            )
+                          }
+                        >
+                          <FileSpreadsheet aria-hidden="true" />
+                          Portofolio Excel (.xlsx)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void downloadUrlWithToast(
+                              getExportHref("pdf"),
+                              "portofolio-proyek.pdf",
+                            )
+                          }
+                        >
+                          <FileText aria-hidden="true" />
+                          Portofolio PDF Resmi
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void downloadUrlWithToast(
+                              getExportHref("csv"),
+                              "portofolio-proyek.csv",
+                            )
+                          }
+                        >
+                          <Download aria-hidden="true" />
+                          Export CSV (.csv)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handlePrintPortfolio()}>
+                          <Printer aria-hidden="true" />
+                          Cetak Tabel Portofolio (Pratinjau Cetak)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => setProjectViewMode("dinas")}
+                        >
+                          <LayoutTemplate aria-hidden="true" />
+                          Buka Rekap Portofolio &amp; Dinas
+                        </DropdownMenuItem>
+                        {selectedProjectIds.length === 1 && (() => {
+                          const chosen = projects.find(
+                            (p) => p.id === selectedProjectIds[0],
+                          );
+                          if (!chosen) return null;
+                          return (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                                Proyek Terpilih: {chosen.code}
+                              </DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  void downloadUrlWithToast(
+                                    `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=daily&format=pdf`,
+                                    `Laporan-Harian-${chosen.code}.pdf`,
+                                  )
+                                }
+                              >
+                                <FileText aria-hidden="true" />
+                                PDF Harian
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  void downloadUrlWithToast(
+                                    `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=progress&format=pdf`,
+                                    `Progres-KurvaS-${chosen.code}.pdf`,
+                                  )
+                                }
+                              >
+                                <FileText aria-hidden="true" />
+                                PDF Progres &amp; Kurva-S
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  void downloadUrlWithToast(
+                                    `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=progress&format=xlsx`,
+                                    `Progres-KurvaS-${chosen.code}.xlsx`,
+                                  )
+                                }
+                              >
+                                <FileSpreadsheet aria-hidden="true" />
+                                Excel Progres &amp; Kurva-S
+                              </DropdownMenuItem>
+                              {canViewFinancials && (
+                                <>
+                                  <DropdownMenuItem
+                                    onSelect={() =>
+                                      void downloadUrlWithToast(
+                                        `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=financial&format=pdf`,
+                                        `Keuangan-RAB-RAP-${chosen.code}.pdf`,
+                                      )
+                                    }
+                                  >
+                                    <FileText aria-hidden="true" />
+                                    PDF Keuangan RAB/RAP
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() =>
+                                      void downloadUrlWithToast(
+                                        `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=financial&format=xlsx`,
+                                        `Keuangan-RAB-RAP-${chosen.code}.xlsx`,
+                                      )
+                                    }
+                                  >
+                                    <FileSpreadsheet aria-hidden="true" />
+                                    Excel Keuangan RAB/RAP
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setNewProjectOpen(true)}
+                      onClick={() => setShowWorkflowGuide((prev) => !prev)}
                       className="gap-1.5"
                     >
-                      <Plus className="size-4" aria-hidden="true" />
-                      <span>Proyek Baru</span>
+                      <span>Alur 4 Tahap</span>
+                      {showWorkflowGuide ? (
+                        <ChevronUp className="size-3.5" aria-hidden="true" />
+                      ) : (
+                        <ChevronDown className="size-3.5" aria-hidden="true" />
+                      )}
                     </Button>
-                  )}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPicChart((prev) => !prev)}
+                      className="gap-1.5"
+                    >
+                      <ChartSpline
+                        className="size-4 text-primary"
+                        aria-hidden="true"
+                      />
+                      <span>Grafik PIC</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const projectId =
+                          surveyProjectId || surveyProjects[0]?.id || "none";
+                        router.push(
+                          `/apps/projects?section=surveys&view=map&projectId=${encodeURIComponent(projectId)}`,
+                        );
+                      }}
+                      className="gap-1.5"
+                    >
+                      <MapPinned
+                        className="size-4 text-sky-500"
+                        aria-hidden="true"
+                      />
+                      <span>Peta GIS</span>
+                    </Button>
+                  </div>
                 </div>
-              </>
+              </div>
             }
           />
 

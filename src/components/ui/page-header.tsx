@@ -45,7 +45,7 @@ export function PageHeader({
         className,
       )}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           {breadcrumbs && breadcrumbs.length > 0 ? (
             <Breadcrumb>
@@ -80,7 +80,7 @@ export function PageHeader({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="type-h1 truncate text-foreground">{title}</h1>
+            <h1 className="type-h1 text-foreground">{title}</h1>
             {badge}
           </div>
 
