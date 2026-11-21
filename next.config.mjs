@@ -30,6 +30,9 @@ const nextConfig = {
     },
     reactStrictMode: false,
     serverExternalPackages: ["@prisma/client", "puppeteer-core", "@sparticuz/chromium", "nodemailer"],
+    outputFileTracingIncludes: {
+        "/**": ["./node_modules/@sentry/**/*"],
+    },
     images: {
         unoptimized: true,
         remotePatterns: [

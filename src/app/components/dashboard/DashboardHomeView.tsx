@@ -39,6 +39,7 @@ const ticketStatusLabels: Record<TicketStatus, string> = {
   [TicketStatus.APPROVED_DIR]: "Disetujui",
   [TicketStatus.PROCESSED_FINANCE]: "Diproses keuangan",
   [TicketStatus.PROCESSED_LOGISTIC]: "Diproses logistik",
+  [TicketStatus.PENDING_LOGISTIK]: "Menunggu logistik",
   [TicketStatus.ASSIGNED_TO_MOVER]: "Dalam pengiriman",
   [TicketStatus.IN_TRANSIT]: "Dalam perjalanan (ekspedisi)",
   [TicketStatus.WAITING_FINANCE_PAYMENT]: "Menunggu pembayaran",

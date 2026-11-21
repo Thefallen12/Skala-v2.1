@@ -2647,6 +2647,46 @@ export function DinasProjectReportPage({
         // ignore storage cleanup errors
       }
     }
+
+    // Purge any stale or invalid v2 adjustment entries where linkedProjectId is incompatible
+    try {
+      const existingV2 = readAdjustmentsStoreFromStorage();
+      const sanitizedV2: PhotoAdjustmentsStore = {};
+      let v2Changed = false;
+      for (const [key, entry] of Object.entries(existingV2)) {
+        if (!entry || typeof entry !== "object") {
+          v2Changed = true;
+          continue;
+        }
+        const matchingRecord = DINAS_PROJECTS_DATA.find(
+          (r) => buildDinasAdjustmentGroupKey(r) === entry.groupKey,
+        );
+        if (!matchingRecord) {
+          v2Changed = true;
+          continue;
+        }
+        if (entry.linkedProjectId) {
+          const linked = projectByIdMap.get(entry.linkedProjectId);
+          if (!linked || !isProjectPoktanCompatible(linked, matchingRecord)) {
+            v2Changed = true;
+            continue;
+          }
+        }
+        if (entry.projectId) {
+          const linked = projectByIdMap.get(entry.projectId);
+          if (!linked || !isProjectPoktanCompatible(linked, matchingRecord)) {
+            v2Changed = true;
+            continue;
+          }
+        }
+        sanitizedV2[key] = entry;
+      }
+      if (v2Changed) {
+        persistPhotoAdjustments(sanitizedV2);
+      }
+    } catch {
+      // ignore storage cleanup errors
+    }
   }, [projects, projectByIdMap, autoLinkedProjectByNo]);
 
   const resolveAdjustmentForRecord = useCallback(

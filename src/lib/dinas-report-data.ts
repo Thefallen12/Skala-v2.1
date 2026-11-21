@@ -1612,7 +1612,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
   },
 ];
 
-const ALL_DINAS_POKTAN_KEYS = new Set(
+export const ALL_DINAS_POKTAN_KEYS = new Set(
   DINAS_PROJECTS_DATA.flatMap((record) => getDinasPoktanKeys(record)),
 );
 
@@ -1626,19 +1626,19 @@ export function isProjectPoktanCompatible(
   const recordKeys = new Set(getDinasPoktanKeys(record));
   if (recordKeys.size === 0) return false;
 
-  const nameKey = normalizePoktanKey(project.name);
-  const titleKey = normalizePoktanKey(project.title);
-  if (
-    (nameKey && ALL_DINAS_POKTAN_KEYS.has(nameKey) && !recordKeys.has(nameKey)) ||
-    (titleKey && ALL_DINAS_POKTAN_KEYS.has(titleKey) && !recordKeys.has(titleKey))
-  ) {
-    return false;
+  const projectKeys = extractProjectPoktanKeys(project);
+  const hasMatchingKey = projectKeys.some((k) => recordKeys.has(k));
+  if (!hasMatchingKey) return false;
+
+  // Strict anti-leak guard: if any candidate identifier in the project matches a DIFFERENT
+  // known Dinas Poktan (e.g. project title or name mentions 'Buge Temas' but record is 'Hikmah'),
+  // reject immediately to prevent cross-project photo leakage.
+  for (const key of projectKeys) {
+    if (ALL_DINAS_POKTAN_KEYS.has(key) && !recordKeys.has(key)) {
+      return false;
+    }
   }
 
-  const ktKey = normalizePoktanKey(project.kelompokTani);
-  if (ktKey) {
-    return recordKeys.has(ktKey);
-  }
-
-  return extractProjectPoktanKeys(project).some((key) => recordKeys.has(key));
+  return true;
 }
+
