@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
 import { useSearchParams } from "next/navigation";
@@ -15,8 +16,10 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   ArrowUpRight,
+  AtSign,
   Bot,
   Brain,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -46,6 +49,7 @@ import {
   Settings2,
   Sparkles,
   Terminal,
+  Trash2,
   Upload,
   Users,
   X,
@@ -611,6 +615,53 @@ function isHermesDocumentAttachment(attachment: ChatAttachmentItem): boolean {
   );
 }
 
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderContentWithMentions(
+  content: string,
+  knownNames: string[],
+  isOwnMessage: boolean,
+) {
+  if (!content) return null;
+  const normalizedNames = Array.from(
+    new Set(
+      knownNames
+        .map((n) => n.trim())
+        .filter((n) => n.length >= 2),
+    ),
+  ).sort((a, b) => b.length - a.length);
+
+  const nameAlternation = normalizedNames.map(escapeRegexLiteral).join("|");
+  const patternBody = nameAlternation
+    ? `(?:^|(?<=\\s))@(?:${nameAlternation}|bunglon|skala|semua|all|[a-zA-Z0-9_.-]{2,30})(?=$|[\\s.,!?;:)])`
+    : `(?:^|(?<=\\s))@(?:bunglon|skala|semua|all|[a-zA-Z0-9_.-]{2,30})(?=$|[\\s.,!?;:)])`;
+  const regex = new RegExp(`(${patternBody})`, "gi");
+  const segments = content.split(regex);
+
+  if (segments.length <= 1) return content;
+
+  return segments.map((segment, index) => {
+    if (index % 2 === 1 && segment.startsWith("@")) {
+      return (
+        <span
+          key={index}
+          className={cn(
+            "inline-block rounded px-1 font-semibold",
+            isOwnMessage
+              ? "bg-amber-400/25 text-amber-200"
+              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+          )}
+        >
+          {segment}
+        </span>
+      );
+    }
+    return segment;
+  });
+}
+
 interface DocumentForwardPopoverProps {
   attachment: ChatAttachmentItem;
   channels: ChatRoomDto[];
@@ -660,16 +711,21 @@ function DocumentForwardPopover({
       const docCode = attachment.documentNumber
         ? ` (${attachment.documentNumber})`
         : "";
+      const prefix = isImageAttachment(attachment)
+        ? "Mengirim foto"
+        : isHermesDocumentAttachment(attachment)
+          ? "Mengirim dokumen resmi Bunglon"
+          : "Mengirim dokumen";
       await fetchJson<PostMessageResponse>("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...payload,
-          content: `Mengirim dokumen resmi dari Hermes: ${attachment.title}${docCode}`,
+          content: `${prefix}: ${attachment.title}${docCode}`,
           attachments: [attachment],
         }),
       });
-      toast.success(`Dokumen dikirim ke ${targetLabel}`);
+      toast.success(`Lampiran dikirim ke ${targetLabel}`);
       setOpen(false);
       setQuery("");
       onForwardSuccess(targetLabel);
@@ -677,7 +733,7 @@ function DocumentForwardPopover({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Gagal mengirim dokumen ke rekan/grup.",
+          : "Gagal mengirim lampiran ke rekan/grup.",
       );
     } finally {
       setSendingTargetKey(null);
@@ -704,7 +760,7 @@ function DocumentForwardPopover({
       >
         <div className="border-b border-border px-3 py-2">
           <p className="text-xs font-bold text-foreground">
-            Kirim Dokumen ke Rekan / Kanal
+            Teruskan Lampiran ke Rekan / Kanal
           </p>
           <div className="relative mt-1.5">
             <Search
@@ -881,23 +937,34 @@ function ChatAttachmentCard({
             </span>
           )}
         </button>
-        <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[11px]">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 text-[11px]">
           <span className="min-w-0 truncate font-medium">
             {attachment.title}
           </span>
-          <a
-            href={downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            download={attachment.title}
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 font-semibold underline-offset-2 hover:underline",
-              isOwnMessage ? "text-amber-300" : "text-primary",
+          <div className="flex flex-wrap items-center gap-1.5">
+            <a
+              href={downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={attachment.title}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 font-semibold underline-offset-2 hover:underline",
+                isOwnMessage ? "text-amber-300" : "text-primary",
+              )}
+            >
+              <Download className="size-3" aria-hidden="true" />
+              <span>Unduh</span>
+            </a>
+            {allowForward && (
+              <DocumentForwardPopover
+                attachment={attachment}
+                channels={channels}
+                users={users}
+                directRoomByUserId={directRoomByUserId}
+                onForwardSuccess={onForwardSuccess}
+              />
             )}
-          >
-            <Download className="size-3" aria-hidden="true" />
-            <span>Unduh</span>
-          </a>
+          </div>
         </div>
       </div>
     );
@@ -1020,7 +1087,7 @@ function ChatAttachmentCard({
             <span>{isHermesDoc ? "Unduh" : "Unduh PDF"}</span>
           </Button>
         )}
-        {allowForward && isHermesDoc && (
+        {allowForward && (
           <DocumentForwardPopover
             attachment={attachment}
             channels={channels}
@@ -1142,17 +1209,39 @@ export default function FloatingChatWidget({
   const [pendingAttachments, setPendingAttachments] = useState<
     ChatAttachmentItem[]
   >([]);
+  const [selectedMentions, setSelectedMentions] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const [dismissedMentionText, setDismissedMentionText] = useState<
+    string | null
+  >(null);
   const [sendingTeam, setSendingTeam] = useState(false);
   const [teamThinking, setTeamThinking] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [uploadKind, setUploadKind] = useState<UploadKind>("FTO");
+  const [uploadKind, setUploadKind] = useState<UploadKind>("DRW");
   const [uploadProjectId, setUploadProjectId] = useState<string>("NONE");
   const [attachPopoverOpen, setAttachPopoverOpen] = useState(false);
   const [hermesPickerOpen, setHermesPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const teamPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const teamTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Clear conversation & message deletion state
+  const [clearTeamPopoverOpen, setClearTeamPopoverOpen] = useState(false);
+  const [clearHermesPopoverOpen, setClearHermesPopoverOpen] = useState(false);
+  const [clearingChatTarget, setClearingChatTarget] = useState<
+    "team" | "hermes" | null
+  >(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
+    null,
+  );
 
   // Bunglon Assistant (SKALA AI / Hermes compatible) state
   const [hermesInput, setHermesInput] = useState("");
+  const [pendingHermesAttachments, setPendingHermesAttachments] = useState<
+    ChatAttachmentItem[]
+  >([]);
   const [pendingHermesPrompt, setPendingHermesPrompt] = useState<string | null>(
     null,
   );
@@ -1167,6 +1256,8 @@ export default function FloatingChatWidget({
   const [showApiKey, setShowApiKey] = useState(false);
   const [copiedCli, setCopiedCli] = useState(false);
   const [testingGateway, setTestingGateway] = useState(false);
+  const hermesPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const hermesDocInputRef = useRef<HTMLInputElement | null>(null);
 
   // Thinking & natural progressive typing reveal state
   const [thinkingTickIdx, setThinkingTickIdx] = useState(0);
@@ -1562,43 +1653,228 @@ export default function FloatingChatWidget({
     }
   };
 
-  const handleUploadFileChange = async (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
+  const knownMentionNames = useMemo(() => {
+    const names = (bootstrap?.users ?? []).map((u) => u.name);
+    if (effectiveUserName) names.push(effectiveUserName);
+    return names;
+  }, [bootstrap?.users, effectiveUserName]);
 
-    if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error("Ukuran file maksimal 10 MB.");
-      return;
+  const activeMentionMatch = useMemo(() => {
+    const match = teamInput.match(/(?:^|\s)@([a-zA-Z0-9_.\-\s]{0,28})$/);
+    if (!match) return null;
+    const rawToken = `@${match[1]}`;
+    const query = match[1].toLowerCase().trimStart();
+    const startIndex = teamInput.length - rawToken.length;
+    return {
+      rawToken,
+      query,
+      startIndex,
+    };
+  }, [teamInput]);
+
+  type MentionCandidate =
+    | {
+        kind: "assistant";
+        key: string;
+        label: string;
+        subtitle: string;
+        insertText: string;
+      }
+    | {
+        kind: "all";
+        key: string;
+        label: string;
+        subtitle: string;
+        insertText: string;
+      }
+    | {
+        kind: "user";
+        key: string;
+        user: ChatUserDto;
+        label: string;
+        subtitle: string;
+        insertText: string;
+      };
+
+  const mentionCandidates = useMemo((): MentionCandidate[] => {
+    if (!activeMentionMatch) return [];
+    const q = activeMentionMatch.query;
+    const isChannel = activeTeamRoom?.type === "CHANNEL";
+    const candidates: MentionCandidate[] = [];
+
+    if (
+      !q ||
+      "bunglon assistant skala ai".includes(q) ||
+      "bunglon".startsWith(q)
+    ) {
+      candidates.push({
+        kind: "assistant",
+        key: "assistant:bunglon",
+        label: "Bunglon Assistant",
+        subtitle: "SKALA AI · Asisten ERP, Input Data & Dokumen",
+        insertText: "@bunglon ",
+      });
     }
 
-    setUploadingFile(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("kind", uploadKind);
-      if (uploadProjectId && uploadProjectId !== "NONE") {
-        formData.append("projectId", uploadProjectId);
-      }
+    if (
+      isChannel &&
+      (!q || "semua all everyone grup".includes(q) || "semua".startsWith(q))
+    ) {
+      candidates.push({
+        kind: "all",
+        key: "group:semua",
+        label: "semua",
+        subtitle: `Tag semua anggota di ${activeTeamRoom?.name ?? "grup"}`,
+        insertText: "@semua ",
+      });
+    }
 
-      const result = await fetchJson<UploadAttachmentResponse>(
-        "/api/chat/upload",
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
-      setPendingAttachments((prev) => [...prev, result.attachment]);
-      setAttachPopoverOpen(false);
-      toast.success(`Lampiran "${result.attachment.title}" siap dikirim`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Gagal mengunggah lampiran.",
-      );
-    } finally {
-      setUploadingFile(false);
+    for (const user of teamUsers) {
+      const nameLower = user.name.toLowerCase();
+      const roleLower = getRoleLabel(user.role).toLowerCase();
+      if (!q || nameLower.includes(q) || roleLower.includes(q)) {
+        candidates.push({
+          kind: "user",
+          key: `user:${user.id}`,
+          user,
+          label: user.name,
+          subtitle: getRoleLabel(user.role),
+          insertText: `@${user.name} `,
+        });
+      }
+    }
+
+    return candidates.slice(0, 8);
+  }, [activeMentionMatch, activeTeamRoom, teamUsers]);
+
+  const isMentionMenuOpen = Boolean(
+    activeMentionMatch &&
+      mentionCandidates.length > 0 &&
+      dismissedMentionText !== activeMentionMatch.rawToken,
+  );
+
+  const handleSelectMentionCandidate = useCallback(
+    (candidate: MentionCandidate) => {
+      if (!activeMentionMatch) return;
+      const prefix = teamInput.slice(0, activeMentionMatch.startIndex);
+      setTeamInput(`${prefix}${candidate.insertText}`);
+      setDismissedMentionText(null);
+      setMentionActiveIndex(0);
+
+      if (candidate.kind === "user") {
+        setSelectedMentions((prev) =>
+          prev.some((item) => item.id === candidate.user.id)
+            ? prev
+            : [...prev, { id: candidate.user.id, name: candidate.user.name }],
+        );
+      }
+    },
+    [activeMentionMatch, teamInput],
+  );
+
+  const uploadFilesToChat = useCallback(
+    async (
+      fileList: FileList | File[],
+      options: { target: "team" | "hermes"; forcedKind?: UploadKind },
+    ) => {
+      const files = Array.from(fileList).slice(0, 5);
+      if (files.length === 0) return;
+
+      const validFiles: File[] = [];
+      for (const file of files) {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          toast.error(`Ukuran "${file.name}" melebihi batas maksimal 10 MB.`);
+          continue;
+        }
+        if (file.size < 1) continue;
+        validFiles.push(file);
+      }
+      if (validFiles.length === 0) return;
+
+      setUploadingFile(true);
+      try {
+        const uploadedItems: ChatAttachmentItem[] = [];
+        const selectedProjId =
+          options.target === "hermes" ? docProjectId : uploadProjectId;
+
+        for (const file of validFiles) {
+          const isImageFile =
+            file.type.startsWith("image/") ||
+            /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+          const resolvedKind: UploadKind = options.forcedKind
+            ? options.forcedKind
+            : isImageFile
+              ? "FTO"
+              : uploadKind === "FTO"
+                ? "DRW"
+                : uploadKind;
+
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("kind", resolvedKind);
+          if (selectedProjId && selectedProjId !== "NONE") {
+            formData.append("projectId", selectedProjId);
+          }
+
+          const result = await fetchJson<UploadAttachmentResponse>(
+            "/api/chat/upload",
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
+          uploadedItems.push(result.attachment);
+        }
+
+        if (uploadedItems.length > 0) {
+          if (options.target === "hermes") {
+            setPendingHermesAttachments((prev) => [...prev, ...uploadedItems]);
+          } else {
+            setPendingAttachments((prev) => [...prev, ...uploadedItems]);
+          }
+          setAttachPopoverOpen(false);
+          toast.success(
+            uploadedItems.length === 1
+              ? `Lampiran "${uploadedItems[0].title}" siap dikirim`
+              : `${uploadedItems.length} lampiran siap dikirim`,
+          );
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Gagal mengunggah lampiran.",
+        );
+      } finally {
+        setUploadingFile(false);
+      }
+    },
+    [docProjectId, uploadKind, uploadProjectId],
+  );
+
+  const handleUploadFileChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+    options: { target: "team" | "hermes"; forcedKind?: UploadKind },
+  ) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    event.target.value = "";
+    if (files.length === 0) return;
+    await uploadFilesToChat(files, options);
+  };
+
+  const handlePasteAttachment = (
+    event: ClipboardEvent<HTMLTextAreaElement>,
+    target: "team" | "hermes",
+  ) => {
+    const items = Array.from(event.clipboardData?.items ?? []);
+    const pastedImages: File[] = [];
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) pastedImages.push(file);
+      }
+    }
+    if (pastedImages.length > 0) {
+      event.preventDefault();
+      void uploadFilesToChat(pastedImages, { target, forcedKind: "FTO" });
     }
   };
 
@@ -1624,6 +1900,11 @@ export default function FloatingChatWidget({
       `Melampirkan ${pendingAttachments.map((att) => att.title).join(", ")}`;
     const mentionsBunglon =
       /@(?:bunglon|skala|assistant|ai)\b/i.test(finalContent);
+    const activeMentionedIds = selectedMentions
+      .filter((item) =>
+        finalContent.toLowerCase().includes(`@${item.name.toLowerCase()}`),
+      )
+      .map((item) => item.id);
 
     setSendingTeam(true);
     if (mentionsBunglon) {
@@ -1639,6 +1920,7 @@ export default function FloatingChatWidget({
               roomId: selectedTarget.roomId,
               content: finalContent,
               attachments: pendingAttachments,
+              mentionedUserIds: activeMentionedIds,
               invokeAssistant: mentionsBunglon,
               projectId:
                 uploadProjectId && uploadProjectId !== "NONE"
@@ -1651,6 +1933,7 @@ export default function FloatingChatWidget({
               targetUserId: selectedTarget.userId,
               content: finalContent,
               attachments: pendingAttachments,
+              mentionedUserIds: activeMentionedIds,
               invokeAssistant: mentionsBunglon,
               projectId:
                 uploadProjectId && uploadProjectId !== "NONE"
@@ -1668,6 +1951,8 @@ export default function FloatingChatWidget({
 
       setTeamInput("");
       setPendingAttachments([]);
+      setSelectedMentions([]);
+      setDismissedMentionText(null);
       if (selectedTarget.kind === "user" && result.room?.id) {
         setSelectedTarget({ kind: "room", roomId: result.room.id });
       }
@@ -1688,6 +1973,7 @@ export default function FloatingChatWidget({
     sendingTeam,
     teamInput,
     pendingAttachments,
+    selectedMentions,
     uploadProjectId,
     savedGatewayUrl,
     savedApiKey,
@@ -1699,6 +1985,39 @@ export default function FloatingChatWidget({
   const handleTeamTextareaKeyDown = (
     event: KeyboardEvent<HTMLTextAreaElement>,
   ) => {
+    if (isMentionMenuOpen && mentionCandidates.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setMentionActiveIndex((prev) => (prev + 1) % mentionCandidates.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setMentionActiveIndex(
+          (prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length,
+        );
+        return;
+      }
+      if (
+        (event.key === "Enter" || event.key === "Tab") &&
+        !event.shiftKey &&
+        !event.nativeEvent.isComposing
+      ) {
+        event.preventDefault();
+        const candidate =
+          mentionCandidates[mentionActiveIndex] ?? mentionCandidates[0];
+        if (candidate) {
+          handleSelectMentionCandidate(candidate);
+        }
+        return;
+      }
+      if (event.key === "Escape" && activeMentionMatch) {
+        event.preventDefault();
+        setDismissedMentionText(activeMentionMatch.rawToken);
+        return;
+      }
+    }
+
     if (
       event.key === "Enter" &&
       !event.shiftKey &&
@@ -1706,6 +2025,85 @@ export default function FloatingChatWidget({
     ) {
       event.preventDefault();
       void handleSendTeamMessage();
+    }
+  };
+
+  const handleClearConversation = async (target: "team" | "hermes") => {
+    if (clearingChatTarget) return;
+
+    if (target === "team") {
+      if (!activeTeamRoomId) {
+        setClearTeamPopoverOpen(false);
+        setTeamInput("");
+        setPendingAttachments([]);
+        toast.info("Belum ada riwayat pesan di ruang ini.");
+        return;
+      }
+      setClearingChatTarget("team");
+      try {
+        await fetchJson<{ ok: boolean; deletedCount: number }>(
+          `/api/chat/messages?roomId=${encodeURIComponent(activeTeamRoomId)}`,
+          { method: "DELETE" },
+        );
+        setClearTeamPopoverOpen(false);
+        setTypingReveal(null);
+        await Promise.all([mutateTeamMessages(), mutateBootstrap()]);
+        toast.success("Obrolan di ruang ini berhasil dihapus.");
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Gagal menghapus obrolan.",
+        );
+      } finally {
+        setClearingChatTarget(null);
+      }
+      return;
+    }
+
+    setClearingChatTarget("hermes");
+    try {
+      await fetchJson<{ ok: boolean; deletedCount: number }>(
+        "/api/chat/messages?mode=hermes",
+        { method: "DELETE" },
+      );
+      setClearHermesPopoverOpen(false);
+      setTypingReveal(null);
+      await Promise.all([mutateHermesMessages(), mutateBootstrap()]);
+      toast.success("Riwayat obrolan Bunglon AI berhasil dihapus.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Gagal menghapus riwayat obrolan Bunglon AI.",
+      );
+    } finally {
+      setClearingChatTarget(null);
+    }
+  };
+
+  const handleDeleteSingleMessage = async (
+    messageId: string,
+    target: "team" | "hermes",
+  ) => {
+    if (deletingMessageId) return;
+    setDeletingMessageId(messageId);
+    try {
+      const url =
+        target === "hermes"
+          ? `/api/chat/messages?mode=hermes&messageId=${encodeURIComponent(messageId)}`
+          : `/api/chat/messages?roomId=${encodeURIComponent(activeTeamRoomId ?? "")}&messageId=${encodeURIComponent(messageId)}`;
+      await fetchJson<{ ok: boolean }>(url, { method: "DELETE" });
+      if (target === "hermes") {
+        await Promise.all([mutateHermesMessages(), mutateBootstrap()]);
+      } else {
+        await Promise.all([mutateTeamMessages(), mutateBootstrap()]);
+      }
+      toast.success("Pesan dihapus");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Gagal menghapus pesan.",
+      );
+    } finally {
+      setDeletingMessageId(null);
     }
   };
 
@@ -1777,11 +2175,17 @@ export default function FloatingChatWidget({
 
   const handleSendHermesPrompt = async (customMessage?: string) => {
     if (sendingHermes) return;
-    const content = (customMessage ?? hermesInput).trim();
-    if (!content) return;
+    const rawContent = (customMessage ?? hermesInput).trim();
+    const attachmentsToSend = customMessage ? [] : pendingHermesAttachments;
+    if (!rawContent && attachmentsToSend.length === 0) return;
+
+    const content =
+      rawContent ||
+      `Saya melampirkan ${attachmentsToSend.map((att) => att.title).join(", ")}. Tolong bantu cek ya.`;
 
     if (!customMessage) {
       setHermesInput("");
+      setPendingHermesAttachments([]);
     }
     setPendingHermesPrompt(content);
     setThinkingTickIdx(0);
@@ -1794,6 +2198,7 @@ export default function FloatingChatWidget({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: content,
+            attachments: attachmentsToSend,
             projectId:
               docProjectId && docProjectId !== "NONE" ? docProjectId : undefined,
             ticketId:
@@ -2389,16 +2794,75 @@ export default function FloatingChatWidget({
             </div>
           </div>
 
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label="Muat ulang pesan"
-            onClick={() => void mutateTeamMessages()}
-            className="size-7 shrink-0"
-          >
-            <RefreshCw className="size-3.5" aria-hidden="true" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Muat ulang pesan"
+              onClick={() => void mutateTeamMessages()}
+              className="size-7 shrink-0"
+            >
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+            </Button>
+
+            <Popover
+              open={clearTeamPopoverOpen}
+              onOpenChange={setClearTeamPopoverOpen}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  aria-label="Hapus obrolan"
+                  title="Hapus semua obrolan di ruang ini"
+                  disabled={!activeTeamRoomId || (teamMessagesData?.messages.length ?? 0) === 0}
+                  className="h-7 gap-1 px-1.5 text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">Hapus Obrolan</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={6}
+                className="w-64 border border-border p-3 shadow-xl"
+              >
+                <p className="text-xs font-bold text-foreground">
+                  Hapus Obrolan Ini?
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Seluruh riwayat pesan &amp; lampiran di{" "}
+                  <strong>{conversationTitle}</strong> akan dihapus permanen.
+                </p>
+                <div className="mt-2.5 flex items-center justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => setClearTeamPopoverOpen(false)}
+                    className="h-7 px-2 text-[11px]"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="destructive"
+                    disabled={clearingChatTarget === "team"}
+                    onClick={() => void handleClearConversation("team")}
+                    className="h-7 gap-1 px-2 text-[11px]"
+                  >
+                    {clearingChatTarget === "team" && (
+                      <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                    )}
+                    <span>Ya, Hapus</span>
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Message stream */}
@@ -2500,7 +2964,13 @@ export default function FloatingChatWidget({
                     )}
 
                     <p className="whitespace-pre-wrap break-words text-xs leading-relaxed">
-                      {displayedContent}
+                      {isTypingThisMessage
+                        ? displayedContent
+                        : renderContentWithMentions(
+                            displayedContent,
+                            knownMentionNames,
+                            isOwn,
+                          )}
                       {isTypingThisMessage && (
                         <span
                           aria-hidden="true"
@@ -2538,7 +3008,7 @@ export default function FloatingChatWidget({
                                 key={att.id}
                                 attachment={att}
                                 isOwnMessage={isOwn}
-                                allowForward={isAssistantMessage}
+                                allowForward
                                 channels={bootstrap?.channels ?? []}
                                 users={teamUsers}
                                 directRoomByUserId={directRoomByUserId}
@@ -2550,14 +3020,46 @@ export default function FloatingChatWidget({
                       </>
                     )}
 
-                    <p
-                      className={cn(
-                        "text-right text-[10px] tabular-nums",
-                        isOwn ? "text-white/70" : "text-muted-foreground",
+                    <div className="flex items-center justify-end gap-2">
+                      {(isOwn ||
+                        isAssistantMessage ||
+                        effectiveUserRole === "DIRECTOR" ||
+                        effectiveUserRole === "DEPUTY_DIRECTOR" ||
+                        effectiveUserRole === "ADMINISTRATIONS") && (
+                        <button
+                          type="button"
+                          aria-label="Hapus pesan"
+                          title="Hapus pesan ini"
+                          disabled={deletingMessageId === message.id}
+                          onClick={() =>
+                            void handleDeleteSingleMessage(message.id, "team")
+                          }
+                          className={cn(
+                            "rounded p-0.5 transition-colors disabled:opacity-50",
+                            isOwn
+                              ? "text-white/60 hover:bg-white/15 hover:text-white"
+                              : "text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive",
+                          )}
+                        >
+                          {deletingMessageId === message.id ? (
+                            <Loader2
+                              className="size-3 animate-spin"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Trash2 className="size-3" aria-hidden="true" />
+                          )}
+                        </button>
                       )}
-                    >
-                      {formatWibTime(message.createdAt)}
-                    </p>
+                      <p
+                        className={cn(
+                          "text-right text-[10px] tabular-nums",
+                          isOwn ? "text-white/70" : "text-muted-foreground",
+                        )}
+                      >
+                        {formatWibTime(message.createdAt)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               );
@@ -2631,18 +3133,121 @@ export default function FloatingChatWidget({
           </div>
         )}
 
-        {/* Composer */}
-        <div className="border-t border-border bg-card p-2.5">
+        {/* Composer + WhatsApp-style @mention autocomplete */}
+        <div className="relative border-t border-border bg-card p-2.5">
+          {isMentionMenuOpen && (
+            <div
+              role="listbox"
+              aria-label="Tag anggota atau Bunglon"
+              className="absolute inset-x-2.5 bottom-full z-30 mb-1.5 max-h-56 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl"
+            >
+              <div className="flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <span>Tag Anggota / Bunglon</span>
+                <span>Enter / Klik untuk pilih</span>
+              </div>
+              {mentionCandidates.map((candidate, index) => {
+                const isSelected = index === mentionActiveIndex;
+                return (
+                  <button
+                    key={candidate.key}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      handleSelectMentionCandidate(candidate);
+                      window.requestAnimationFrame(() => {
+                        teamTextareaRef.current?.focus();
+                      });
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors",
+                      isSelected
+                        ? "bg-[#0f2b4d] text-white dark:bg-primary dark:text-primary-foreground"
+                        : "hover:bg-accent",
+                    )}
+                  >
+                    {candidate.kind === "assistant" ? (
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-[#0f2b4d] text-white">
+                        <Bot className="size-3.5" aria-hidden="true" />
+                      </span>
+                    ) : candidate.kind === "all" ? (
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300">
+                        <Users className="size-3.5" aria-hidden="true" />
+                      </span>
+                    ) : (
+                      <Avatar className="size-7 shrink-0 border border-border/60">
+                        {candidate.user.profilePhotoUrl && (
+                          <AvatarImage
+                            src={candidate.user.profilePhotoUrl}
+                            alt={candidate.label}
+                          />
+                        )}
+                        <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+                          {getInitials(candidate.label)}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold">@{candidate.label}</p>
+                      <p
+                        className={cn(
+                          "truncate text-[10px]",
+                          isSelected ? "text-white/80" : "text-muted-foreground",
+                        )}
+                      >
+                        {candidate.subtitle}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <input
+            ref={teamPhotoInputRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            onChange={(event) =>
+              void handleUploadFileChange(event, {
+                target: "team",
+                forcedKind: "FTO",
+              })
+            }
+            className="sr-only"
+          />
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={(event) => void handleUploadFileChange(event)}
+            onChange={(event) =>
+              void handleUploadFileChange(event, { target: "team" })
+            }
             className="sr-only"
           />
 
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {/* Upload file popover */}
+            {/* 1-click Foto upload */}
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              disabled={uploadingFile}
+              onClick={() => teamPhotoInputRef.current?.click()}
+              className="h-7 gap-1 px-2 text-[11px]"
+            >
+              {uploadingFile ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Camera className="size-3.5" aria-hidden="true" />
+              )}
+              <span>Foto</span>
+            </Button>
+
+            {/* Upload Dokumen / File Operasional popover */}
             <Popover open={attachPopoverOpen} onOpenChange={setAttachPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -2652,15 +3257,8 @@ export default function FloatingChatWidget({
                   disabled={uploadingFile}
                   className="h-7 gap-1 px-2 text-[11px]"
                 >
-                  {uploadingFile ? (
-                    <Loader2
-                      className="size-3.5 animate-spin"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Paperclip className="size-3.5" aria-hidden="true" />
-                  )}
-                  <span>Unggah File</span>
+                  <Paperclip className="size-3.5" aria-hidden="true" />
+                  <span>Dokumen / File</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -2730,7 +3328,7 @@ export default function FloatingChatWidget({
                   className="mt-3 w-full gap-1.5 text-xs"
                 >
                   <Upload className="size-3.5" aria-hidden="true" />
-                  <span>Pilih File dari Perangkat</span>
+                  <span>Pilih Dokumen / Foto dari Perangkat</span>
                 </Button>
               </PopoverContent>
             </Popover>
@@ -2745,7 +3343,7 @@ export default function FloatingChatWidget({
                   className="h-7 gap-1 px-2 text-[11px]"
                 >
                   <FileCheck2 className="size-3.5" aria-hidden="true" />
-                  <span>Lampirkan Dokumen Bunglon</span>
+                  <span>Dokumen Bunglon</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -2820,6 +3418,30 @@ export default function FloatingChatWidget({
               type="button"
               size="xs"
               variant="outline"
+              onClick={() => {
+                setDismissedMentionText(null);
+                setMentionActiveIndex(0);
+                setTeamInput((prev) =>
+                  /(?:^|\s)@$/.test(prev)
+                    ? prev
+                    : prev.trimEnd()
+                      ? `${prev.trimEnd()} @`
+                      : "@",
+                );
+                window.requestAnimationFrame(() => {
+                  teamTextareaRef.current?.focus();
+                });
+              }}
+              className="h-7 gap-1 px-2 text-[11px]"
+            >
+              <AtSign className="size-3.5" aria-hidden="true" />
+              <span>Tag</span>
+            </Button>
+
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
               onClick={() =>
                 setTeamInput((prev) =>
                   /@bunglon\b/i.test(prev)
@@ -2838,10 +3460,16 @@ export default function FloatingChatWidget({
 
           <div className="flex items-end gap-2">
             <Textarea
+              ref={teamTextareaRef}
               value={teamInput}
-              onChange={(event) => setTeamInput(event.target.value)}
+              onChange={(event) => {
+                setTeamInput(event.target.value);
+                setDismissedMentionText(null);
+                setMentionActiveIndex(0);
+              }}
               onKeyDown={handleTeamTextareaKeyDown}
-              placeholder="Tulis pesan atau ketik @bunglon untuk panggil asisten..."
+              onPaste={(event) => handlePasteAttachment(event, "team")}
+              placeholder="Ketik pesan, @ untuk tag rekan/@bunglon, atau tempel foto..."
               rows={2}
               className="mt-0 min-h-10 max-h-28 resize-none text-xs"
             />
@@ -2949,6 +3577,63 @@ export default function FloatingChatWidget({
               <span className="hidden sm:inline">Setup CLI</span>
               <span className="sm:hidden">CLI</span>
             </Button>
+
+            <Popover
+              open={clearHermesPopoverOpen}
+              onOpenChange={setClearHermesPopoverOpen}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  aria-label="Hapus obrolan Bunglon AI"
+                  title="Hapus semua riwayat obrolan Bunglon AI"
+                  disabled={messages.length === 0}
+                  className="h-7 gap-1 px-1.5 text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">Hapus Obrolan</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={6}
+                className="w-64 border border-border p-3 shadow-xl"
+              >
+                <p className="text-xs font-bold text-foreground">
+                  Hapus Obrolan Bunglon AI?
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Seluruh riwayat percakapan Anda dengan{" "}
+                  <strong>Bunglon Assistant</strong> akan dibersihkan.
+                </p>
+                <div className="mt-2.5 flex items-center justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => setClearHermesPopoverOpen(false)}
+                    className="h-7 px-2 text-[11px]"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="destructive"
+                    disabled={clearingChatTarget === "hermes"}
+                    onClick={() => void handleClearConversation("hermes")}
+                    className="h-7 gap-1 px-2 text-[11px]"
+                  >
+                    {clearingChatTarget === "hermes" && (
+                      <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                    )}
+                    <span>Ya, Hapus</span>
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -3667,14 +4352,40 @@ export default function FloatingChatWidget({
                       </>
                     )}
 
-                    <p
-                      className={cn(
-                        "text-right text-[10px] tabular-nums",
-                        isUser ? "text-white/70" : "text-muted-foreground",
-                      )}
-                    >
-                      {formatWibTime(message.createdAt)}
-                    </p>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        aria-label="Hapus pesan"
+                        title="Hapus pesan ini"
+                        disabled={deletingMessageId === message.id}
+                        onClick={() =>
+                          void handleDeleteSingleMessage(message.id, "hermes")
+                        }
+                        className={cn(
+                          "rounded p-0.5 transition-colors disabled:opacity-50",
+                          isUser
+                            ? "text-white/60 hover:bg-white/15 hover:text-white"
+                            : "text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive",
+                        )}
+                      >
+                        {deletingMessageId === message.id ? (
+                          <Loader2
+                            className="size-3 animate-spin"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Trash2 className="size-3" aria-hidden="true" />
+                        )}
+                      </button>
+                      <p
+                        className={cn(
+                          "text-right text-[10px] tabular-nums",
+                          isUser ? "text-white/70" : "text-muted-foreground",
+                        )}
+                      >
+                        {formatWibTime(message.createdAt)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               );
@@ -3701,9 +4412,92 @@ export default function FloatingChatWidget({
           <div ref={hermesMessagesEndRef} />
         </div>
 
+        {/* Pending staged attachments for Bunglon AI */}
+        {pendingHermesAttachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 border-t border-border bg-muted/30 px-3 py-2">
+            {pendingHermesAttachments.map((att) => (
+              <div
+                key={att.id}
+                className="flex max-w-full items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-medium text-foreground"
+              >
+                {isImageAttachment(att) ? (
+                  <ImageIcon
+                    className="size-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <FileText
+                    className="size-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="max-w-[160px] truncate">{att.title}</span>
+                <button
+                  type="button"
+                  aria-label={`Hapus lampiran ${att.title}`}
+                  onClick={() =>
+                    setPendingHermesAttachments((prev) =>
+                      prev.filter((item) => item.id !== att.id),
+                    )
+                  }
+                  className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Quick prompt chips + Bunglon Composer */}
         <div className="border-t border-border bg-card p-2.5 space-y-2">
+          <input
+            ref={hermesPhotoInputRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            onChange={(event) =>
+              void handleUploadFileChange(event, {
+                target: "hermes",
+                forcedKind: "FTO",
+              })
+            }
+            className="sr-only"
+          />
+          <input
+            ref={hermesDocInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={(event) =>
+              void handleUploadFileChange(event, {
+                target: "hermes",
+                forcedKind: "DRW",
+              })
+            }
+            className="sr-only"
+          />
+
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+            <button
+              type="button"
+              disabled={uploadingFile}
+              onClick={() => hermesPhotoInputRef.current?.click()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-300"
+            >
+              <Camera className="size-3" aria-hidden="true" />
+              <span>Foto</span>
+            </button>
+            <button
+              type="button"
+              disabled={uploadingFile}
+              onClick={() => hermesDocInputRef.current?.click()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+            >
+              <Paperclip className="size-3" aria-hidden="true" />
+              <span>Dokumen</span>
+            </button>
+
             {HERMES_QUICK_PROMPTS.map((chip) => (
               <button
                 key={chip.label}
@@ -3734,7 +4528,8 @@ export default function FloatingChatWidget({
               value={hermesInput}
               onChange={(event) => setHermesInput(event.target.value)}
               onKeyDown={handleHermesTextareaKeyDown}
-              placeholder="Tanya Bunglon, input laporan/tiket/catatan, atau buat PDF..."
+              onPaste={(event) => handlePasteAttachment(event, "hermes")}
+              placeholder="Tanya Bunglon, input laporan/tiket, tempel foto, atau buat PDF..."
               rows={2}
               className="mt-0 min-h-10 max-h-28 resize-none text-xs"
             />
@@ -3742,7 +4537,10 @@ export default function FloatingChatWidget({
               type="button"
               size="icon"
               aria-label="Kirim ke Bunglon AI"
-              disabled={sendingHermes || !hermesInput.trim()}
+              disabled={
+                sendingHermes ||
+                (!hermesInput.trim() && pendingHermesAttachments.length === 0)
+              }
               onClick={() => void handleSendHermesPrompt()}
               className="size-10 shrink-0 rounded-xl bg-[#0f2b4d] text-amber-400 hover:bg-[#173d6c]"
             >

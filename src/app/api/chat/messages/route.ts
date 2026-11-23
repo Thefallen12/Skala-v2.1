@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { NotificationType } from "@prisma/client";
+import { NotificationType, UserRole } from "@prisma/client";
 import { auth } from "@/../auth";
 import {
   getRequestOrigin,
@@ -407,6 +407,7 @@ export async function POST(request: NextRequest) {
     targetUserId?: unknown;
     content?: unknown;
     attachments?: unknown;
+    mentionedUserIds?: unknown;
     invokeAssistant?: unknown;
     projectId?: unknown;
     customGatewayUrl?: unknown;
@@ -480,6 +481,53 @@ export async function POST(request: NextRequest) {
     const messageContent = trimmedContent || "[Lampiran]";
     const previewText = buildMessagePreview(trimmedContent, attachments);
 
+    const activeOtherUsers = await prisma.user.findMany({
+      where: { isActive: true, id: { not: userId } },
+      select: { id: true, name: true },
+    });
+
+    const explicitMentionIds = new Set(
+      Array.isArray(payload.mentionedUserIds)
+        ? payload.mentionedUserIds.filter(
+            (id): id is string => typeof id === "string" && id.trim().length > 0,
+          )
+        : [],
+    );
+
+    const mentionedUsersMap = new Map<string, { id: string; name: string }>();
+    const lowerContent = trimmedContent.toLowerCase();
+    const tagsEveryone =
+      room.type === "CHANNEL" &&
+      /@(?:semua|all|everyone)\b/i.test(trimmedContent);
+
+    const escapeMentionRegex = (text: string) =>
+      text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    for (const candidate of activeOtherUsers) {
+      if (tagsEveryone || explicitMentionIds.has(candidate.id)) {
+        mentionedUsersMap.set(candidate.id, candidate);
+        continue;
+      }
+      const cleanName = candidate.name.trim();
+      if (!cleanName) continue;
+      if (lowerContent.includes(`@${cleanName.toLowerCase()}`)) {
+        mentionedUsersMap.set(candidate.id, candidate);
+        continue;
+      }
+      const firstWord = cleanName.split(/\s+/)[0] ?? "";
+      if (firstWord.length >= 3) {
+        const firstWordPattern = new RegExp(
+          `(?:^|\\s)@${escapeMentionRegex(firstWord)}(?=$|[\\s.,!?;:)])`,
+          "i",
+        );
+        if (firstWordPattern.test(trimmedContent)) {
+          mentionedUsersMap.set(candidate.id, candidate);
+        }
+      }
+    }
+
+    const mentionedUsers = Array.from(mentionedUsersMap.values());
+
     const createdMessage = await ChatMessageModel.create({
       _id: randomUUID(),
       roomId: String(room._id),
@@ -489,7 +537,13 @@ export async function POST(request: NextRequest) {
       senderAvatarUrl,
       content: messageContent,
       attachments,
-      metadata: null,
+      metadata:
+        mentionedUsers.length > 0
+          ? {
+              mentionedUserIds: mentionedUsers.map((u) => u.id),
+              mentionedNames: mentionedUsers.map((u) => u.name),
+            }
+          : null,
       readByIds: [userId],
       createdAt: now,
       updatedAt: now,
@@ -499,12 +553,10 @@ export async function POST(request: NextRequest) {
     if (room.type === "DIRECT") {
       recipientIds = room.participantIds.filter((id) => id && id !== userId);
     } else if (room.type === "CHANNEL") {
-      const otherUsers = await prisma.user.findMany({
-        where: { isActive: true, id: { not: userId } },
-        select: { id: true },
-      });
       recipientIds = Array.from(
-        new Set(otherUsers.map((u) => u.id).filter((id) => id && id !== userId)),
+        new Set(
+          activeOtherUsers.map((u) => u.id).filter((id) => id && id !== userId),
+        ),
       );
     }
 
@@ -573,6 +625,18 @@ export async function POST(request: NextRequest) {
           );
         }
       }
+    } else if (room.type === "CHANNEL" && mentionedUsers.length > 0) {
+      await Promise.allSettled(
+        mentionedUsers.slice(0, 25).map((mentionedUser) =>
+          sendNotification({
+            userId: mentionedUser.id,
+            title: `${senderName} menyebut Anda di #${room.name}`.slice(0, 180),
+            message: previewText,
+            actionUrl: `/?openChat=${encodeURIComponent(String(room._id))}`,
+            type: NotificationType.INFO,
+          }),
+        ),
+      );
     }
 
     const shouldInvokeAssistant =
@@ -707,6 +771,155 @@ export async function POST(request: NextRequest) {
     console.error("[Chat Messages POST] Gagal mengirim pesan:", error);
     return NextResponse.json(
       { message: "Gagal mengirim pesan. Silakan coba kembali." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { message: "Silakan masuk terlebih dahulu untuk menghapus obrolan." },
+      { status: 401 },
+    );
+  }
+
+  const userId = session.user.id;
+  const userRole = session.user.role;
+  const roomId = request.nextUrl.searchParams.get("roomId");
+  const targetUserId = request.nextUrl.searchParams.get("targetUserId");
+  const mode = request.nextUrl.searchParams.get("mode");
+  const messageId = request.nextUrl.searchParams.get("messageId")?.trim() || null;
+
+  try {
+    await connectToMongoDB();
+
+    let targetRoom: ChatRoomDocument | null = null;
+    if (mode === "hermes") {
+      targetRoom = await ChatRoomModel.findOne({
+        roomKey: `hermes:${userId}`,
+      }).lean<ChatRoomDocument | null>();
+      if (!targetRoom) {
+        return NextResponse.json({
+          ok: true,
+          deletedCount: 0,
+          room: null,
+        });
+      }
+    } else {
+      const resolution = await resolveAccessibleRoom({
+        currentUserId: userId,
+        roomId,
+        targetUserId,
+      });
+      if (!resolution.ok) {
+        return NextResponse.json(
+          { message: resolution.message },
+          { status: resolution.status },
+        );
+      }
+      targetRoom = resolution.room;
+    }
+
+    const resolvedRoomId = String(targetRoom._id);
+
+    if (messageId) {
+      const existingMessage = await ChatMessageModel.findOne({
+        _id: messageId,
+        roomId: resolvedRoomId,
+      }).lean<ChatMessageDocument | null>();
+
+      if (!existingMessage) {
+        return NextResponse.json(
+          { message: "Pesan tidak ditemukan." },
+          { status: 404 },
+        );
+      }
+
+      const canDeleteAnyMessage =
+        userRole === UserRole.DIRECTOR ||
+        userRole === UserRole.DEPUTY_DIRECTOR ||
+        userRole === UserRole.ADMINISTRATIONS;
+      if (
+        existingMessage.senderId !== userId &&
+        existingMessage.senderId !== "hermes-assistant" &&
+        !canDeleteAnyMessage
+      ) {
+        return NextResponse.json(
+          { message: "Anda hanya dapat menghapus pesan Anda sendiri." },
+          { status: 403 },
+        );
+      }
+
+      await ChatMessageModel.deleteOne({
+        _id: messageId,
+        roomId: resolvedRoomId,
+      });
+
+      const latestRemaining = await ChatMessageModel.findOne({
+        roomId: resolvedRoomId,
+      })
+        .sort({ createdAt: -1 })
+        .lean<ChatMessageDocument | null>();
+
+      const updatedRoom = await ChatRoomModel.findByIdAndUpdate(
+        targetRoom._id,
+        {
+          $set: latestRemaining
+            ? {
+                lastMessageText: buildMessagePreview(
+                  latestRemaining.content,
+                  Array.isArray(latestRemaining.attachments)
+                    ? latestRemaining.attachments
+                    : [],
+                ),
+                lastMessageAt: latestRemaining.createdAt ?? new Date(),
+                lastMessageSenderId: latestRemaining.senderId,
+                lastMessageSenderName: latestRemaining.senderName,
+              }
+            : {
+                lastMessageText: null,
+                lastMessageSenderId: null,
+                lastMessageSenderName: null,
+              },
+        },
+        { returnDocument: "after" },
+      ).lean<ChatRoomDocument | null>();
+
+      return NextResponse.json({
+        ok: true,
+        deletedCount: 1,
+        room: serializeRoom(updatedRoom ?? targetRoom, userId),
+      });
+    }
+
+    const deleteResult = await ChatMessageModel.deleteMany({
+      roomId: resolvedRoomId,
+    });
+
+    const clearedRoom = await ChatRoomModel.findByIdAndUpdate(
+      targetRoom._id,
+      {
+        $set: {
+          lastMessageText: null,
+          lastMessageSenderId: null,
+          lastMessageSenderName: null,
+          unreadCounts: {},
+        },
+      },
+      { returnDocument: "after" },
+    ).lean<ChatRoomDocument | null>();
+
+    return NextResponse.json({
+      ok: true,
+      deletedCount: deleteResult.deletedCount ?? 0,
+      room: serializeRoom(clearedRoom ?? targetRoom, userId),
+    });
+  } catch (error) {
+    console.error("[Chat Messages DELETE] Gagal menghapus obrolan:", error);
+    return NextResponse.json(
+      { message: "Gagal menghapus obrolan. Silakan coba kembali." },
       { status: 500 },
     );
   }

@@ -15,6 +15,8 @@ import {
 import {
   ChatMessageModel,
   ChatRoomModel,
+  type ChatAttachmentItem,
+  type ChatAttachmentKind,
   type ChatDataActionType,
   type ChatGeneratedDocumentRecord,
   type ChatMessageDocument,
@@ -93,8 +95,73 @@ interface HermesChatRequestBody {
   docType?: unknown;
   docParams?: unknown;
   dataInput?: unknown;
+  attachments?: unknown;
   customGatewayUrl?: unknown;
   customApiKey?: unknown;
+}
+
+const VALID_HERMES_ATTACHMENT_KINDS = new Set<ChatAttachmentKind>([
+  "DOCUMENT",
+  "ATTACHMENT",
+  "IMAGE",
+  "FILE",
+]);
+
+function sanitizeHermesAttachments(raw: unknown): ChatAttachmentItem[] {
+  if (!Array.isArray(raw)) return [];
+  const items: ChatAttachmentItem[] = [];
+  for (const entry of raw.slice(0, 10)) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const title = typeof record.title === "string" ? record.title.trim() : "";
+    const url = typeof record.url === "string" ? record.url.trim() : "";
+    if (!title || !url) continue;
+
+    const rawKind =
+      typeof record.kind === "string"
+        ? (record.kind.trim().toUpperCase() as ChatAttachmentKind)
+        : "FILE";
+    const kind: ChatAttachmentKind = VALID_HERMES_ATTACHMENT_KINDS.has(rawKind)
+      ? rawKind
+      : "FILE";
+
+    items.push({
+      id:
+        typeof record.id === "string" && record.id.trim()
+          ? record.id.trim()
+          : randomUUID(),
+      title: title.slice(0, 240),
+      kind,
+      docType:
+        typeof record.docType === "string" ? record.docType.trim() || null : null,
+      documentNumber:
+        typeof record.documentNumber === "string"
+          ? record.documentNumber.trim() || null
+          : null,
+      assetCode:
+        typeof record.assetCode === "string"
+          ? record.assetCode.trim() || null
+          : null,
+      url,
+      downloadUrl:
+        typeof record.downloadUrl === "string"
+          ? record.downloadUrl.trim() || null
+          : null,
+      mimeType:
+        typeof record.mimeType === "string" ? record.mimeType.trim() || null : null,
+      sizeBytes:
+        typeof record.sizeBytes === "number" && Number.isFinite(record.sizeBytes)
+          ? record.sizeBytes
+          : null,
+      summary:
+        typeof record.summary === "string" ? record.summary.trim() || null : null,
+      documentId:
+        typeof record.documentId === "string"
+          ? record.documentId.trim() || null
+          : null,
+    });
+  }
+  return items;
 }
 
 const VALID_DATA_ACTION_TYPES = new Set<ChatDataActionType>([
@@ -171,6 +238,7 @@ export async function POST(request: NextRequest) {
   }
 
   const dataInput = parseDataInputPayload(body.dataInput);
+  const userAttachments = sanitizeHermesAttachments(body.attachments);
 
   const message =
     rawMessage ||
@@ -178,11 +246,13 @@ export async function POST(request: NextRequest) {
       ? `Buatkan dokumen ${explicitDocType}`
       : dataInput
         ? `Input data ${dataInput.actionType}${dataInput.title ? `: ${dataInput.title}` : ""}`
-        : "");
+        : userAttachments.length > 0
+          ? `Saya melampirkan ${userAttachments.map((a) => a.title).join(", ")}. Tolong bantu cek lampiran ini.`
+          : "");
 
-  if (!message) {
+  if (!message && userAttachments.length === 0) {
     return NextResponse.json(
-      { message: "Pesan tidak boleh kosong." },
+      { message: "Pesan atau lampiran tidak boleh kosong." },
       { status: 400 },
     );
   }
@@ -267,7 +337,7 @@ export async function POST(request: NextRequest) {
     senderRole: userRole.slice(0, 64),
     senderAvatarUrl: session.user.image ?? null,
     content: message.slice(0, 8000),
-    attachments: [],
+    attachments: userAttachments,
     metadata: {
       projectId,
       ticketId,
