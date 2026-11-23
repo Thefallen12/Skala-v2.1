@@ -61,7 +61,7 @@ export const HERMES_INSTALL_COMMANDS: string[] = [
 ];
 
 const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
 const DEFAULT_HERMES_GATEWAY_URL = "http://127.0.0.1:8642";
 const BLOCKED_METADATA_HOSTS = new Set([
   "169.254.169.254",
@@ -189,6 +189,40 @@ export interface ErpSelectedTicketDetail {
   }>;
 }
 
+export interface ErpProjectRiskItem {
+  code: string;
+  title: string;
+  picName: string | null;
+  progress: number;
+  paidAbsorptionPct: number;
+  variancePct: number;
+  riskReason: string;
+}
+
+export interface ErpPortfolioAnalytics {
+  totalActiveProjects: number;
+  totalPaguAmount: number;
+  totalPaguFormatted: string;
+  totalPaidAmount: number;
+  totalPaidFormatted: string;
+  totalRequestedAmount: number;
+  totalRequestedFormatted: string;
+  totalRemainingPaguAmount: number;
+  totalRemainingPaguFormatted: string;
+  overallPaidAbsorptionPct: number;
+  overallRequestedAbsorptionPct: number;
+  averageProgressPct: number;
+  projectsAtRiskCount: number;
+  projectsAtRisk: ErpProjectRiskItem[];
+  categoryTotals: {
+    TUKANG: ErpFundCategoryBreakdown;
+    BAHAN: ErpFundCategoryBreakdown;
+    SEWA: ErpFundCategoryBreakdown;
+    INVENTARIS: ErpFundCategoryBreakdown;
+    OPERASIONAL: ErpFundCategoryBreakdown;
+  };
+}
+
 export interface HermesErpContextSummary {
   activeProjectsCount: number;
   topProjects: ErpProjectSummary[];
@@ -196,6 +230,7 @@ export interface HermesErpContextSummary {
   selectedProject: ErpSelectedProjectDetail | null;
   selectedTicket: ErpSelectedTicketDetail | null;
   pendingTicketsCount: number;
+  portfolioAnalytics: ErpPortfolioAnalytics;
   latestPendingTickets: Array<{
     id: string;
     ticketNumber: string;
@@ -455,6 +490,9 @@ function getGeminiModelCandidates(): string[] {
   const candidates = [
     configured,
     DEFAULT_GEMINI_MODEL,
+    "gemini-3-flash-preview",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-2.5-flash-lite",
     "gemini-flash-latest",
   ].filter(Boolean);
@@ -502,10 +540,11 @@ export async function callGeminiApi(params: {
           },
           contents,
           generationConfig: {
-            temperature: 0.1,
+            temperature: 0.25,
+            maxOutputTokens: 2500,
           },
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(25000),
         cache: "no-store",
       });
 
@@ -1533,6 +1572,123 @@ export async function loadErpContextSummary(
       unitPriceFormatted: formatRupiah(parseScaledAmount(item.unitPrice)),
     }));
 
+  const activeEntries = projectRecordsWithSummary.filter(
+    (entry) =>
+      entry.raw.status !== ProjectStatus.DONE &&
+      entry.raw.status !== ProjectStatus.COMPLETED,
+  );
+
+  let macroPagu = 0;
+  let macroPaid = 0;
+  let macroRequested = 0;
+  let totalProgressSum = 0;
+
+  const macroCategories: Record<
+    ProjectFundCategory,
+    { count: number; requested: number; paid: number }
+  > = {
+    TUKANG: { count: 0, requested: 0, paid: 0 },
+    BAHAN: { count: 0, requested: 0, paid: 0 },
+    SEWA: { count: 0, requested: 0, paid: 0 },
+    INVENTARIS: { count: 0, requested: 0, paid: 0 },
+    OPERASIONAL: { count: 0, requested: 0, paid: 0 },
+  };
+
+  const projectsAtRisk: ErpProjectRiskItem[] = [];
+
+  for (const entry of activeEntries) {
+    const s = entry.summary;
+    const recap = s.fundRecap;
+    macroPagu += s.paguAmount;
+    macroPaid += recap.totalPaidAmount;
+    macroRequested += recap.totalRequestedAmount;
+    totalProgressSum += s.progress;
+
+    for (const cat of [
+      "TUKANG",
+      "BAHAN",
+      "SEWA",
+      "INVENTARIS",
+      "OPERASIONAL",
+    ] as const) {
+      macroCategories[cat].count += recap.byCategory[cat].count;
+      macroCategories[cat].requested += recap.byCategory[cat].requestedAmount;
+      macroCategories[cat].paid += recap.byCategory[cat].paidAmount;
+    }
+
+    const variance =
+      Math.round((recap.absorptionPaidPct - s.progress) * 10) / 10;
+    const isStalled =
+      entry.raw.status === ProjectStatus.ON_HOLD ||
+      entry.raw.status === ProjectStatus.TERHAMBAT;
+    const isOverSpent =
+      recap.absorptionPaidPct > s.progress + 15 && s.paguAmount > 0;
+    const isPaguExhausted =
+      recap.remainingFromPaidAmount <= 0 &&
+      s.progress < 90 &&
+      s.paguAmount > 0;
+
+    if (isOverSpent || isStalled || isPaguExhausted) {
+      let reason = "";
+      if (isOverSpent) {
+        reason = `Deviasi pengeluaran tinggi (+${variance}%): Serapan cair ${recap.absorptionPaidPct}% melampaui progres fisik ${s.progress.toFixed(1)}%.`;
+      } else if (isPaguExhausted) {
+        reason = `Pagu anggaran telah terserap habis (100%), namun progres fisik baru mencapai ${s.progress.toFixed(1)}%.`;
+      } else if (isStalled) {
+        reason = `Status proyek tertahan / terhambat (${s.status}), pekerjaan fisik belum berjalan optimal.`;
+      }
+      projectsAtRisk.push({
+        code: s.code,
+        title: s.title,
+        picName: s.picName,
+        progress: s.progress,
+        paidAbsorptionPct: recap.absorptionPaidPct,
+        variancePct: variance,
+        riskReason: reason,
+      });
+    }
+  }
+
+  const macroRemaining = Math.max(0, macroPagu - macroPaid);
+  const avgProgress =
+    activeEntries.length > 0 ? totalProgressSum / activeEntries.length : 0;
+  const overallPaidPct =
+    macroPagu > 0 ? (macroPaid / macroPagu) * 100 : 0;
+  const overallReqPct =
+    macroPagu > 0 ? (macroRequested / macroPagu) * 100 : 0;
+
+  const toMacroCat = (k: ProjectFundCategory): ErpFundCategoryBreakdown => ({
+    count: macroCategories[k].count,
+    requestedAmount: macroCategories[k].requested,
+    requestedFormatted: formatRupiah(macroCategories[k].requested),
+    paidAmount: macroCategories[k].paid,
+    paidFormatted: formatRupiah(macroCategories[k].paid),
+  });
+
+  const portfolioAnalytics: ErpPortfolioAnalytics = {
+    totalActiveProjects: activeEntries.length,
+    totalPaguAmount: macroPagu,
+    totalPaguFormatted: formatRupiah(macroPagu),
+    totalPaidAmount: macroPaid,
+    totalPaidFormatted: formatRupiah(macroPaid),
+    totalRequestedAmount: macroRequested,
+    totalRequestedFormatted: formatRupiah(macroRequested),
+    totalRemainingPaguAmount: macroRemaining,
+    totalRemainingPaguFormatted: formatRupiah(macroRemaining),
+    overallPaidAbsorptionPct: Math.round(overallPaidPct * 10) / 10,
+    overallRequestedAbsorptionPct: Math.round(overallReqPct * 10) / 10,
+    averageProgressPct: Math.round(avgProgress * 10) / 10,
+    projectsAtRiskCount: projectsAtRisk.length,
+    projectsAtRisk,
+    categoryTotals: {
+      TUKANG: toMacroCat("TUKANG"),
+      BAHAN: toMacroCat("BAHAN"),
+      SEWA: toMacroCat("SEWA"),
+      INVENTARIS: toMacroCat("INVENTARIS"),
+      OPERASIONAL: toMacroCat("OPERASIONAL"),
+    },
+  };
+
   return {
     activeProjectsCount,
     topProjects,
@@ -1540,6 +1696,7 @@ export async function loadErpContextSummary(
     selectedProject,
     selectedTicket,
     pendingTicketsCount,
+    portfolioAnalytics,
     latestPendingTickets,
     matchedTickets,
     lowStockItems,
@@ -1565,6 +1722,7 @@ function buildCompactContextForLlm(erpContext: HermesErpContextSummary) {
     activeProjectsCount: erpContext.activeProjectsCount,
     pendingTicketsCount: erpContext.pendingTicketsCount,
     totalStockItemsCount: erpContext.totalStockItemsCount,
+    portfolioAnalytics: erpContext.portfolioAnalytics,
     selectedProject: erpContext.selectedProject
       ? {
           ...erpContext.selectedProject,
@@ -1614,6 +1772,24 @@ export async function callHermesGateway(
     "ATURAN ANTI-HALUSINASI WAJIB: Gunakan HANYA angka, status, nomor tiket, nama proyek, alamat/lokasi, dan nama PIC dari Konteks ERP Live di bawah. DILARANG keras mengarang angka, menebak pengeluaran, atau mengambil proyek dari daerah yang sama tetapi PIC berbeda.",
     "Jika beberapa proyek berada di lokasi/desa yang mirip (misalnya Lenga), wajib cocokkan menggunakan kombinasi `title`, `kelompokTani`, `address`/`location`, dan `picName` (`fieldPic`). Prioritaskan `selectedProject` atau entri paling relevan di `matchedProjects` yang cocok dengan nama proyek/lokasi/PIC dari pertanyaan.",
     "ATURAN PELAPORAN PENGELUARAN / REKAP DANA PROYEK: Ketika user menanyakan pengeluaran, biaya, kasbon, atau realisasi proyek, wajib sebutkan secara akurat angka dari `fundRecap` proyek tersebut: (1) **Nilai Kontrak / Pagu** (`paguFormatted`), (2) **Total Realisasi Cair / Lunas** (`fundRecap.totalPaidFormatted`), (3) **Total Dana Diajukan** (`fundRecap.totalRequestedFormatted`), (4) **Sisa Pagu Anggaran** (`fundRecap.remainingFromRequestedFormatted`), serta (5) rincian 5 kategori bila datanya > 0: **Ambilan Tukang** (`TUKANG`), **Pembelanjaan Bahan** (`BAHAN`), **Rumah & Kendaraan Sewa** (`SEWA`), **Barang Inventaris** (`INVENTARIS`), dan **Operasional** (`OPERASIONAL`) beserta jumlah tiket, total diajukan, dan total lunas/cairnya. Bedakan tegas antara *Total Realisasi Cair* (sudah lunas/dibayar) vs *Total Dana Diajukan* (termasuk yang masih pending). Jika tidak ada di konteks, katakan terus terang belum ditemukan di sistem.",
+    "KEMAMPUAN ANALISIS MENDALAM & DIAGNOSIS MULTI-VARIABEL (EXECUTIVE REASONING):\n" +
+      "Ketika pengguna meminta analisis, evaluasi performa, audit anggaran, risiko, perbandingan proyek, atau rekomendasi manajerial (atau ketika melihat anomali data), JANGAN hanya menyalin data mentah. Berikan analisis cerdas, komprehensif, dan tajam seperti Senior Project Director & Financial Controller:\n" +
+      "1. **Analisis Variansi Biaya vs Progres Fisik (Earned Value & Burn Rate)**:\n" +
+      "   - Hitung selisih persentase serapan dana cair (`fundRecap.absorptionPaidPct`) terhadap progres fisik lapangan (`progress`).\n" +
+      "   - Jika Serapan Cair > Progres Fisik (terutama selisih > 10-15%), soroti sebagai risiko deviasi pengeluaran (*cost overrun*). Jelaskan apakah pengeluaran didominasi oleh upah tukang (kasbon mendahului titik kerja) atau pembelanjaan material di awal (front-loading bahan).\n" +
+      "   - Jika Progres Fisik jauh lebih tinggi dari serapan cair, apresiasi efisiensi lapangan namun ingatkan untuk mengecek apakah ada tiket/nota vendor yang belum sempat ditagihkan.\n" +
+      "2. **Dekomposisi Pendorong Biaya (Cost Drivers Breakdown)**:\n" +
+      "   - Analisis kontribusi 5 pos pengeluaran (`TUKANG`, `BAHAN`, `SEWA`, `INVENTARIS`, `OPERASIONAL`).\n" +
+      "   - Tunjukkan pos mana yang paling dominan menguras kas dan bandingkan dengan alokasi sisa pagu anggaran.\n" +
+      "3. **Korelasi Risiko Rantai Pasok & Stok Gudang**:\n" +
+      "   - Jika terdapat barang di `lowStockItems` (misal Semen, Besi, Cat), analisis apakah berdampak langsung terhadap potensi berhentinya pekerjaan fisik proyek aktif.\n" +
+      "4. **Evaluasi Portofolio Perusahaan Makro**:\n" +
+      "   - Jika user menanyakan kondisi keseluruhan atau proyek paling berisiko, gunakan data `portfolioAnalytics`: sebutkan total pagu seluruh proyek, total realisasi cair perusahaan, rata-rata progres, dan bedah proyek-proyek yang masuk daftar `portfolioAnalytics.projectsAtRisk`.\n" +
+      "5. **Rekomendasi Taktis & Strategis Manajerial (Actionable Recommendations)**:\n" +
+      "   - Selalu berikan 2-4 butir rekomendasi taktis bernomor yang konkret dan dapat langsung dieksekusi oleh Direksi, Manajer Proyek (PIC), Keuangan, atau Logistik (misalnya: opname titik kerja, rekonsiliasi kasbon tukang, percepatan pengadaan PO sebelum stok habis, efisiensi sewa armada).\n" +
+      "6. **Format & Gaya Penyajian**:\n" +
+      "   - Struktur jawaban: Salam hangat rekan kerja -> Ringkasan Eksekutif -> Poin Analisis Data & Variansi -> Temuan Risiko Kritis -> Rekomendasi Taktis Manajemen.\n" +
+      "   - Gunakan bullet points, bold untuk angka kunci, dan bahasa Indonesia profesional namun hangat.",
     "Kamu bisa membantu user: (1) diskusi & analisis data ERP live, (2) menginput Laporan Harian/Progres Proyek, Tiket Pengajuan, atau Catatan Kerja ke sistem, serta (3) menyusun 8 jenis dokumen/laporan PDF resmi ber-Kop & QR Code.",
     input.userName
       ? `Pengguna aktif saat ini: ${input.userName} (Jabatan/Peran: ${input.userRole || "Staf"}).`
@@ -3288,6 +3464,101 @@ function formatProjectFundRecapReply(p: ErpProjectSummary): string {
     .join("\n");
 }
 
+function formatDeepProjectAnalysisReply(p: ErpProjectSummary): string {
+  const recap = p.fundRecap;
+  const variance = Math.round((recap.absorptionPaidPct - p.progress) * 10) / 10;
+
+  let riskVerdict =
+    "🟢 **Status Anggaran Seimbang:** Kurva realisasi kas selaras dengan laju progres fisik pekerjaan lapangan.";
+  if (variance > 15) {
+    riskVerdict = `⚠️ **Peringatan Deviasi Pengeluaran (+${variance}%):** Serapan kas cair (${recap.absorptionPaidPct}%) mendahului progres fisik lapangan (${p.progress.toFixed(1)}%). Terdapat potensi risiko *cost overrun* yang memerlukan perhatian manajemen.`;
+  } else if (recap.remainingFromPaidAmount <= 0) {
+    riskVerdict = `🚨 **Status Kritis (Pagu Habis):** Anggaran kas telah terserap 100%, namun progres fisik baru mencapai ${p.progress.toFixed(1)}%. Segera lakukan audit titik kerja.`;
+  } else if (variance < -15) {
+    riskVerdict = `✅ **Efisiensi Tinggi / Tiket Pending:** Progres fisik (${p.progress.toFixed(1)}%) mendahului serapan dana cair (${recap.absorptionPaidPct}%). Pastikan seluruh kasbon dan nota belanja lapangan telah terinput ke sistem.`;
+  }
+
+  const rawCategories: Array<[string, ErpFundCategoryBreakdown]> = [
+    ["Ambilan Tukang", recap.byCategory.TUKANG],
+    ["Pembelanjaan Bahan", recap.byCategory.BAHAN],
+    ["Rumah & Kendaraan Sewa", recap.byCategory.SEWA],
+    ["Barang Inventaris", recap.byCategory.INVENTARIS],
+    ["Operasional & Lainnya", recap.byCategory.OPERASIONAL],
+  ];
+  const sortedCategories = [...rawCategories].sort(
+    (a, b) => b[1].paidAmount - a[1].paidAmount,
+  );
+
+  const topDriver = sortedCategories[0] ?? rawCategories[0];
+  const driverPercent =
+    recap.totalPaidAmount > 0
+      ? Math.round((topDriver[1].paidAmount / recap.totalPaidAmount) * 100)
+      : 0;
+
+  return [
+    `Berikut hasil **Analisis & Evaluasi Manajemen ERP** untuk proyek **${p.title}** (\`${p.code}\`):`,
+    "",
+    "### 1. Ringkasan Eksekutif & Variansi Biaya",
+    `- **Lokasi & PIC:** ${p.address || p.location || p.kelompokTani}${p.picName ? ` · PIC: **${p.picName}**` : ""}`,
+    `- **Nilai Pagu Kontrak:** **${p.paguFormatted}**`,
+    `- **Progres Fisik Lapangan:** **${p.progress.toFixed(1)}%** (Status: \`${p.status}\`)`,
+    `- **Realisasi Dana Cair (Lunas):** **${recap.totalPaidFormatted}** (Serapan: **${recap.absorptionPaidPct}%**)`,
+    `- **Total Dana Diajukan:** **${recap.totalRequestedFormatted}** (${recap.absorptionRequestedPct}% dari pagu)`,
+    `- **Sisa Pagu Anggaran:** **${recap.remainingFromRequestedFormatted}**`,
+    `- **Diagnosis Deviasi (Burn Rate):** ${riskVerdict}`,
+    "",
+    "### 2. Dekomposisi Pendorong Biaya (Cost Drivers)",
+    `- **Pos Pengeluaran Terbesar:** **${topDriver[0]}** menyerap **${topDriver[1].paidFormatted}** (~${driverPercent}% dari total pencairan).`,
+    ...sortedCategories
+      .filter(([, b]: [string, ErpFundCategoryBreakdown]) => b.count > 0 || b.paidAmount > 0)
+      .map(
+        ([lbl, b]: [string, ErpFundCategoryBreakdown]) =>
+          `  - **${lbl}**: Cair **${b.paidFormatted}** (${b.count} tiket) · Diajukan **${b.requestedFormatted}**`,
+      ),
+    "",
+    "### 3. Rekomendasi Taktis Manajemen",
+    `1. **Opname Fisik Titik Kerja:** Lakukan verifikasi volume fisik pada titik kerja terkait pos *${topDriver[0]}* guna memastikan kesesuaian antara pengeluaran kas dengan bobot capaian riil di lapangan.`,
+    `2. **Otorisasi Tiket Pending:** Terdapat tiket pengajuan berjalan senilai **${formatRupiah(Math.max(0, recap.totalRequestedAmount - recap.totalPaidAmount))}** yang menunggu verifikasi/pembayaran, pastikan divalidasi bertahap sesuai termin.`,
+    `3. **Pengendalian Sisa Pagu:** Monitor alokasi sisa dana **${recap.remainingFromRequestedFormatted}** untuk sisa pekerjaan hingga target PHO selesai.`,
+  ].join("\n");
+}
+
+function formatPortfolioAnalyticsReply(analytics: ErpPortfolioAnalytics): string {
+  const riskList = analytics.projectsAtRisk.slice(0, 5).map(
+    (item, idx) =>
+      `${idx + 1}. **${item.title}** (\`${item.code}\`${item.picName ? ` · PIC: ${item.picName}` : ""}): Progres **${item.progress.toFixed(1)}%** vs Serapan **${item.paidAbsorptionPct}%**\n   - *Catatan Risiko:* ${item.riskReason}`,
+  );
+
+  return [
+    "Berikut hasil **Analisis Portofolio Makro Perusahaan** dari database ERP PT Skala Prioritas Engineering:",
+    "",
+    "### 1. Indikator Kinerja Utama (Macro KPI)",
+    `- **Total Proyek Aktif:** **${analytics.totalActiveProjects} proyek**`,
+    `- **Total Nilai Pagu Portofolio:** **${analytics.totalPaguFormatted}**`,
+    `- **Total Realisasi Kas Cair:** **${analytics.totalPaidFormatted}** (Serapan: **${analytics.overallPaidAbsorptionPct}%**)`,
+    `- **Total Pengajuan Terdaftar:** **${analytics.totalRequestedFormatted}** (${analytics.overallRequestedAbsorptionPct}%)`,
+    `- **Sisa Pagu Portofolio:** **${analytics.totalRemainingPaguFormatted}**`,
+    `- **Rata-rata Progres Fisik Seluruh Proyek:** **${analytics.averageProgressPct}%**`,
+    "",
+    "### 2. Proyek Berisiko & Deviasi (Risk Watchlist)",
+    analytics.projectsAtRiskCount > 0
+      ? `Teridentifikasi **${analytics.projectsAtRiskCount} proyek** yang memerlukan pengawasan ketat / audit khusus:\n\n${riskList.join("\n\n")}`
+      : "✅ **Seluruh proyek aktif dalam kondisi sehat**, tidak terdeteksi pembengkakan biaya ekstrem (>15%) atau status terhambat.",
+    "",
+    "### 3. Distribusi Serapan per Kategori (Company-Wide)",
+    `- **Ambilan Upah Tukang:** ${analytics.categoryTotals.TUKANG.paidFormatted} (${analytics.categoryTotals.TUKANG.count} tiket)`,
+    `- **Pembelanjaan Bahan:** ${analytics.categoryTotals.BAHAN.paidFormatted} (${analytics.categoryTotals.BAHAN.count} tiket)`,
+    `- **Rumah & Armada Sewa:** ${analytics.categoryTotals.SEWA.paidFormatted} (${analytics.categoryTotals.SEWA.count} tiket)`,
+    `- **Barang Inventaris:** ${analytics.categoryTotals.INVENTARIS.paidFormatted} (${analytics.categoryTotals.INVENTARIS.count} tiket)`,
+    `- **Operasional & Lainnya:** ${analytics.categoryTotals.OPERASIONAL.paidFormatted} (${analytics.categoryTotals.OPERASIONAL.count} tiket)`,
+    "",
+    "### 4. Rekomendasi Strategis Direksi & PM",
+    "1. **Audit Khusus Proyek Deviasi:** Prioritaskan inspeksi lapangan pada proyek-proyek di daftar pengawasan untuk menyeimbangkan antara serapan kas dan capaian fisik.",
+    "2. **Optimalisasi Arus Kas:** Perketat approval pengajuan non-kritis dan pastikan realisasi material terhubung dengan stok gudang eksisting.",
+    "3. **Penyusunan BAST/PHO:** Untuk proyek dengan progres di atas 90%, segera persiapkan dokumen BAST dan berita acara serah terima agar termin pembayaran klien dapat segera dicairkan.",
+  ].join("\n");
+}
+
 export function buildBuiltinErpReply(
   message: string,
   erpContext: HermesErpContextSummary,
@@ -3311,6 +3582,19 @@ export function buildBuiltinErpReply(
 
   const targetMatchedProject =
     erpContext.selectedProject ?? erpContext.matchedProjects[0] ?? null;
+
+  const isAnalyticalQuery =
+    /\b(analisis|analisa|evaluasi|audit|risiko|deviasi|burn\s*rate|sehat|performa|kinerja|komparasi|rekomendasi|over\s*budget|kondisi\s+keuangan)\b/i.test(
+      lower,
+    );
+
+  if (isAnalyticalQuery) {
+    if (targetMatchedProject) {
+      return formatDeepProjectAnalysisReply(targetMatchedProject);
+    }
+    return formatPortfolioAnalyticsReply(erpContext.portfolioAnalytics);
+  }
+
   if (
     targetMatchedProject &&
     /\b(pengeluaran|biaya|realisasi|cair|dana|rekap|kasbon|lunas|anggaran|sisa\s+pagu|habis\s+berapa|total\s+tiket)\b/i.test(
@@ -3459,6 +3743,7 @@ export function buildThinkingSteps(params: {
   docType?: HermesDocType | null;
   projectName?: string | null;
   usedAiModel?: boolean;
+  promptText?: string | null;
 }): string[] {
   const projSuffix = params.projectName ? ` (${params.projectName})` : "";
   if (params.intentType === "data_input") {
@@ -3485,11 +3770,28 @@ export function buildThinkingSteps(params: {
     ];
   }
 
+  const isAnalytical =
+    Boolean(params.promptText) &&
+    /\b(analisis|analisa|evaluasi|audit|risiko|deviasi|burn\s*rate|sehat|performa|kinerja|komparasi|rekomendasi|over\s*budget|kondisi\s+keuangan)\b/i.test(
+      params.promptText ?? "",
+    );
+
+  if (isAnalytical) {
+    return [
+      "Menganalisis variansi realisasi biaya terhadap progres fisik proyek...",
+      "Membedah komposisi serapan 5 pos kategori (Tukang, Bahan, Sewa, Inventaris, Operasional)...",
+      "Mengaudit potensi risiko pembengkakan anggaran & ketersediaan stok gudang...",
+      params.usedAiModel
+        ? "Menyusun evaluasi komprehensif dan rekomendasi taktis manajerial via Gemini 3.5 Flash..."
+        : "Menyusun evaluasi komprehensif dan rekomendasi taktis manajerial berbasis ERP...",
+    ];
+  }
+
   return [
     "Membaca konteks percakapan dan pertanyaan Anda...",
     `Mengambil metrik proyek, tiket, dan stok gudang terbaru dari MongoDB${projSuffix}...`,
     params.usedAiModel
-      ? "Memproses analisis dan merangkai jawaban natural melalui Gemini / Gateway AI..."
+      ? "Memproses analisis dan merangkai jawaban natural melalui Gemini 3.5 Flash..."
       : "Merangkai jawaban natural berbasis data live Skala ERP...",
   ];
 }
@@ -4155,6 +4457,7 @@ export async function runBunglonAssistantTurn(input: {
     intentType: "chat",
     projectName: erpContext.selectedProject?.title ?? null,
     usedAiModel: Boolean(gatewayReply),
+    promptText: promptForIntent,
   });
 
   return {
