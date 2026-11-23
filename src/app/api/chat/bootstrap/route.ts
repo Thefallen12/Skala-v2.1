@@ -75,52 +75,91 @@ function isDuplicateKeyError(error: unknown): boolean {
   );
 }
 
-async function upsertRoomByKey(params: {
+interface RoomSpec {
   roomKey: string;
   type: ChatRoomType;
   name: string;
   description: string | null;
   participantIds: string[];
-}): Promise<{ room: ChatRoomDocument; created: boolean }> {
-  const existing = await ChatRoomModel.findOne({ roomKey: params.roomKey }).lean<ChatRoomDocument | null>();
-  if (existing) {
-    return { room: existing, created: false };
+}
+
+/**
+ * Ensures every room in `specs` exists using a constant number of queries:
+ * one `$in` lookup, plus (only when rooms are missing) one bulk upsert and
+ * one `$in` re-fetch. Replaces per-room findOne/findOneAndUpdate calls.
+ */
+async function ensureRoomsByKey(
+  specs: RoomSpec[],
+): Promise<Map<string, { room: ChatRoomDocument; created: boolean }>> {
+  const keys = specs.map((spec) => spec.roomKey);
+  const result = new Map<string, { room: ChatRoomDocument; created: boolean }>();
+
+  const existing = await ChatRoomModel.find({ roomKey: { $in: keys } }).lean<ChatRoomDocument[]>();
+  for (const room of existing) {
+    result.set(room.roomKey, { room, created: false });
   }
 
+  const missing = specs.filter((spec) => !result.has(spec.roomKey));
+  if (missing.length === 0) {
+    return result;
+  }
+
+  const now = new Date();
+  let upsertedKeys = new Set<string>();
   try {
-    const doc = await ChatRoomModel.findOneAndUpdate(
-      { roomKey: params.roomKey },
-      {
-        $setOnInsert: {
-          _id: randomUUID(),
-          type: params.type,
-          roomKey: params.roomKey,
-          name: params.name,
-          description: params.description,
-          participantIds: params.participantIds,
-          lastMessageText: null,
-          lastMessageAt: new Date(),
-          lastMessageSenderId: null,
-          lastMessageSenderName: null,
-          unreadCounts: {},
+    const bulkResult = await ChatRoomModel.bulkWrite(
+      missing.map((spec) => ({
+        updateOne: {
+          filter: { roomKey: spec.roomKey },
+          update: {
+            $setOnInsert: {
+              _id: randomUUID(),
+              type: spec.type,
+              roomKey: spec.roomKey,
+              name: spec.name,
+              description: spec.description,
+              participantIds: spec.participantIds,
+              lastMessageText: null,
+              lastMessageAt: now,
+              lastMessageSenderId: null,
+              lastMessageSenderName: null,
+              unreadCounts: {},
+            },
+          },
+          upsert: true,
         },
-      },
-      { upsert: true, returnDocument: "after" },
-    ).lean<ChatRoomDocument | null>();
-
-    if (!doc) {
-      throw new Error(`Gagal membuat ruang chat ${params.roomKey}.`);
-    }
-    return { room: doc, created: true };
+      })),
+      { ordered: false },
+    );
+    const upsertedIndexes = Object.keys(bulkResult.upsertedIds ?? {}).map(Number);
+    upsertedKeys = new Set(
+      upsertedIndexes
+        .map((index) => missing[index]?.roomKey)
+        .filter((key): key is string => typeof key === "string"),
+    );
   } catch (error) {
-    if (isDuplicateKeyError(error)) {
-      const raced = await ChatRoomModel.findOne({ roomKey: params.roomKey }).lean<ChatRoomDocument | null>();
-      if (raced) {
-        return { room: raced, created: false };
-      }
+    // A concurrent request may have created the same room (unique roomKey index).
+    // Those rooms are picked up by the re-fetch below; anything else is a real failure.
+    if (!isDuplicateKeyError(error)) {
+      throw error;
     }
-    throw error;
   }
+
+  const created = await ChatRoomModel.find({
+    roomKey: { $in: missing.map((spec) => spec.roomKey) },
+  }).lean<ChatRoomDocument[]>();
+  for (const room of created) {
+    result.set(room.roomKey, { room, created: upsertedKeys.has(room.roomKey) });
+  }
+
+  const stillMissing = missing.filter((spec) => !result.has(spec.roomKey));
+  if (stillMissing.length > 0) {
+    throw new Error(
+      `Gagal membuat ruang chat ${stillMissing.map((spec) => spec.roomKey).join(", ")}.`,
+    );
+  }
+
+  return result;
 }
 
 function serializeRoom(room: ChatRoomDocument, currentUserId: string): ChatRoomDto {
@@ -203,26 +242,28 @@ export async function GET() {
       { upsert: true, returnDocument: "after" },
     );
 
-    await Promise.all(
-      DEFAULT_TEAM_CHANNELS.map((channel) =>
-        upsertRoomByKey({
-          roomKey: channel.roomKey,
-          type: "CHANNEL",
-          name: channel.name,
-          description: channel.description,
-          participantIds: [],
-        }),
-      ),
-    );
-
     const hermesRoomKey = `hermes:${userId}`;
-    const { room: ensuredHermesRoom, created: hermesCreated } = await upsertRoomByKey({
-      roomKey: hermesRoomKey,
-      type: "HERMES",
-      name: "Bunglon Assistant (SKALA AI)",
-      description: "Asisten Cerdas Input Data, Dokumen & Koordinasi Tim ERP",
-      participantIds: [userId],
-    });
+    const ensuredRooms = await ensureRoomsByKey([
+      ...DEFAULT_TEAM_CHANNELS.map((channel) => ({
+        roomKey: channel.roomKey,
+        type: "CHANNEL" as const,
+        name: channel.name,
+        description: channel.description,
+        participantIds: [],
+      })),
+      {
+        roomKey: hermesRoomKey,
+        type: "HERMES",
+        name: "Bunglon Assistant (SKALA AI)",
+        description: "Asisten Cerdas Input Data, Dokumen & Koordinasi Tim ERP",
+        participantIds: [userId],
+      },
+    ]);
+    const ensuredHermes = ensuredRooms.get(hermesRoomKey);
+    if (!ensuredHermes) {
+      throw new Error(`Gagal membuat ruang chat ${hermesRoomKey}.`);
+    }
+    const { room: ensuredHermesRoom, created: hermesCreated } = ensuredHermes;
 
     if (!hermesCreated && ensuredHermesRoom.name === "Hermes Assistant") {
       await ChatRoomModel.updateOne(
