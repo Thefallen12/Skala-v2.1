@@ -15,6 +15,31 @@ export type HermesDocType =
   | "LAPORAN_PROYEK"
   | "SURAT_RESMI";
 
+export type ChatDataActionType =
+  | "DAILY_REPORT"
+  | "CREATE_TICKET"
+  | "CREATE_NOTE";
+
+export interface ChatDataActionResult {
+  actionType: ChatDataActionType;
+  title: string;
+  referenceCode: string;
+  summary: string;
+  targetUrl: string;
+}
+
+export interface ChatPresenceDocument {
+  _id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  lastActiveAt: Date;
+  typingInRoomId: string | null;
+  typingUpdatedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ChatAttachmentItem {
   id: string;
   title: string;
@@ -200,6 +225,31 @@ const chatGeneratedDocumentSchema = new Schema<ChatGeneratedDocumentRecord>(
 chatGeneratedDocumentSchema.index({ documentNumber: 1 }, { unique: true });
 chatGeneratedDocumentSchema.index({ createdById: 1, createdAt: -1 });
 chatGeneratedDocumentSchema.index({ projectId: 1, createdAt: -1 });
+
+const chatPresenceSchema = new Schema<ChatPresenceDocument>(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true, trim: true },
+    userName: { type: String, required: true, maxlength: 160 },
+    userRole: { type: String, required: true, maxlength: 64 },
+    lastActiveAt: { type: Date, default: () => new Date() },
+    typingInRoomId: { type: String, default: null },
+    typingUpdatedAt: { type: Date, default: null },
+  },
+  {
+    collection: "ChatPresence",
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+chatPresenceSchema.index({ userId: 1 }, { unique: true });
+chatPresenceSchema.index({ lastActiveAt: -1 });
+chatPresenceSchema.index({ typingInRoomId: 1, typingUpdatedAt: -1 });
+
+export const ChatPresenceModel =
+  models.ChatPresence ||
+  model<ChatPresenceDocument>("ChatPresence", chatPresenceSchema);
 
 export const ChatRoomModel =
   models.ChatRoom || model<ChatRoomDocument>("ChatRoom", chatRoomSchema);

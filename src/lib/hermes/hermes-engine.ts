@@ -1,8 +1,24 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { ProjectStatus, TicketStatus } from "@prisma/client";
+import {
+  ProjectStatus,
+  TicketPriority,
+  TicketRequestCategory,
+  TicketStatus,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { connectToMongoDB } from "@/lib/mongoose";
-import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import {
+  decimalStringFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
+import {
+  toJakartaDateKey,
+  toJakartaDayStartDate,
+} from "@/lib/project-progress";
+import { getJakartaDayRange } from "@/lib/habit-date";
+import { sendNotification } from "@/lib/notifications";
 import {
   createBrandedQrDataUrl,
   getDocumentHeaderLogoDataUrl,
@@ -11,6 +27,9 @@ import { renderUniversalTransactionDocument } from "@/lib/documents/universal-tr
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import {
   ChatGeneratedDocumentModel,
+  type ChatAttachmentItem,
+  type ChatDataActionResult,
+  type ChatDataActionType,
   type ChatGeneratedDocumentRecord,
   type HermesDocType,
 } from "@/models/chat";
@@ -455,7 +474,7 @@ function buildGeminiOnlineStatus(): HermesGatewayStatus {
     model,
     engineMode: "hermes-gateway",
     detail:
-      "Hermes Assistant terhubung ke Google Gemini API (API_KEY_GEMINI aktif) + Live Database Skala ERP.",
+      "Bunglon Assistant (SKALA AI) terhubung ke Google Gemini API + Live Database Skala ERP.",
     installCommands: HERMES_INSTALL_COMMANDS,
   };
 }
@@ -903,11 +922,12 @@ export async function callHermesGateway(
   const geminiApiKey = resolveGeminiApiKey(input.customApiKey);
 
   const systemPrompt = [
-    "Anda adalah **Hermes Assistant untuk PT Skala Prioritas Engineering** — asisten eksekutif dan operasional untuk sistem ERP konstruksi, teknik sipil, manajemen proyek, logistik material, keuangan, dan administrasi kontrak.",
-    "Jawablah dalam Bahasa Indonesia yang profesional, akurat, ringkas, dan terstruktur.",
-    "Gunakan HANYA data ERP faktual di bawah ini untuk menyebut angka, proyek, tiket, atau stok. Jangan mengarang data yang tidak tercantum.",
+    "Kamu adalah **Bunglon Assistant (SKALA AI)** — rekan kerja asisten AI yang hangat, natural, ramah, cerdas, dan solutif di tim **PT Skala Prioritas Engineering** (bidang konstruksi, teknik sipil, irigasi/rehabilitasi lahan, manajemen proyek, logistik material, dan keuangan).",
+    "Gunakan gaya bahasa Indonesia sehari-hari kantor yang luwes dan natural seperti rekan kerja manusia (misalnya menyapa hangat, 'Siap, barusan saya cek...', 'Oke, ini rinciannya ya...', menyebut nama pengguna dengan sopan), JANGAN kaku atau terdengar seperti robot/template.",
+    "Gunakan HANYA data ERP faktual di bawah ini untuk menyebut angka proyek, progres, tiket, atau stok gudang. Jangan mengarang data yang tidak tercantum.",
+    "Kamu bisa membantu user: (1) diskusi santai & cek data ERP live, (2) membantu menginput Laporan Harian/Progres Proyek, Tiket Pengajuan, atau Catatan Kerja ke sistem, serta (3) menyusun 8 jenis dokumen/laporan PDF resmi ber-Kop & QR Code.",
     input.userName
-      ? `Pengguna aktif: ${input.userName} (Peran: ${input.userRole || "Staf"}).`
+      ? `Pengguna aktif saat ini: ${input.userName} (Jabatan/Peran: ${input.userRole || "Staf"}).`
       : "",
     input.systemInstructionExtra ? input.systemInstructionExtra : "",
     `Konteks ERP Live (JSON):\n${JSON.stringify(input.erpContext)}`,
@@ -2643,13 +2663,740 @@ export function buildBuiltinErpReply(
   }
 
   return [
-    `Halo! Saya **Hermes Assistant** untuk **PT Skala Prioritas Engineering** (Mode: *${gatewayStatus.gatewayOnline ? "Hermes Gateway" : "Built-in Skala ERP"}*).`,
+    `Halo${erpContext.selectedProject ? ` dari proyek ${erpContext.selectedProject.title}` : ""}! Saya **Bunglon Assistant (SKALA AI)** 👋 (Mode: *${gatewayStatus.gatewayOnline ? "Gemini / Gateway Aktif" : "Skala ERP Live"}*).`,
     "",
-    "**Ringkasan ERP Real-Time Saat Ini:**",
-    `- **Proyek Aktif:** ${erpContext.activeProjectsCount} proyek`,
-    `- **Tiket Pending/Berjalan:** ${erpContext.pendingTicketsCount} tiket`,
-    `- **Peringatan Stok Minimum:** ${erpContext.lowStockItems.length} item (dari ${erpContext.totalStockItemsCount} SKU)`,
+    "Saya siap jadi rekan kerja Anda di PT Skala Prioritas Engineering. Barusan saya cek kondisi live sistem:",
+    `- **Proyek Aktif:** ${erpContext.activeProjectsCount} proyek berjalan`,
+    `- **Tiket Pending / Proses:** ${erpContext.pendingTicketsCount} tiket`,
+    `- **Stok di Bawah Batas Minimum:** ${erpContext.lowStockItems.length} item (dari ${erpContext.totalStockItemsCount} SKU)`,
     "",
-    "Anda dapat menanyakan status proyek, stok gudang, atau meminta pembuatan dokumen resmi (Kwitansi, Lampiran Keuangan, SPK, BAST, PO, Surat Jalan/DO, Laporan Proyek, maupun Surat Resmi).",
+    "Mau saya bantu **cek rincian proyek/stok**, **menginput Laporan Harian / Tiket / Catatan**, atau **membuatkan dokumen & laporan PDF**? Tulis saja dengan bahasa santai ya!",
   ].join("\n");
+}
+
+export interface ErpDataInputPayload {
+  actionType: ChatDataActionType;
+  projectId?: string | null;
+  title?: string | null;
+  category?: string | null;
+  amount?: number | null;
+  progress?: number | null;
+  workersCount?: number | null;
+  weather?: string | null;
+  notes?: string | null;
+}
+
+export interface BunglonTurnResult {
+  assistantContent: string;
+  attachments: ChatAttachmentItem[];
+  generatedDocument: ChatGeneratedDocumentRecord | null;
+  dataActionResult: ChatDataActionResult | null;
+  thinkingSteps: string[];
+  engineUsed: "hermes-gateway" | "hermes-builtin-erp";
+  gatewayStatus: HermesGatewayStatus;
+}
+
+export function buildThinkingSteps(params: {
+  intentType: "data_input" | "document" | "chat";
+  actionType?: ChatDataActionType | null;
+  docType?: HermesDocType | null;
+  projectName?: string | null;
+  usedAiModel?: boolean;
+}): string[] {
+  const projSuffix = params.projectName ? ` (${params.projectName})` : "";
+  if (params.intentType === "data_input") {
+    const actionLabel =
+      params.actionType === "DAILY_REPORT"
+        ? `laporan harian & progres proyek${projSuffix}`
+        : params.actionType === "CREATE_TICKET"
+          ? "tiket pengajuan ERP baru"
+          : "catatan kerja";
+    return [
+      "Memahami instruksi input data dan memvalidasi parameter...",
+      `Mencocokkan referensi proyek dan izin akses untuk ${actionLabel}...`,
+      "Menyimpan data baru ke database MongoDB secara transaksional...",
+      "Menyusun ringkasan konfirmasi yang ramah untuk Anda...",
+    ];
+  }
+
+  if (params.intentType === "document") {
+    return [
+      `Menganalisis permintaan dokumen ${params.docType ?? "resmi"}${projSuffix}...`,
+      "Mengambil data live proyek, nilai nominal, dan pihak terkait dari MongoDB...",
+      "Menyusun tata letak dokumen A4 ber-Kop PT Skala Prioritas Engineering & QR Code...",
+      "Menyiapkan file pratinjau HTML & PDF agar langsung bisa dicetak atau dikirim...",
+    ];
+  }
+
+  return [
+    "Membaca konteks percakapan dan pertanyaan Anda...",
+    `Mengambil metrik proyek, tiket, dan stok gudang terbaru dari MongoDB${projSuffix}...`,
+    params.usedAiModel
+      ? "Memproses analisis dan merangkai jawaban natural melalui Gemini / Gateway AI..."
+      : "Merangkai jawaban natural berbasis data live Skala ERP...",
+  ];
+}
+
+function detectDataInputActionType(
+  message: string,
+  explicit?: ErpDataInputPayload | null,
+): ChatDataActionType | null {
+  if (
+    explicit &&
+    (explicit.actionType === "DAILY_REPORT" ||
+      explicit.actionType === "CREATE_TICKET" ||
+      explicit.actionType === "CREATE_NOTE")
+  ) {
+    return explicit.actionType;
+  }
+
+  const trimmed = message.trim();
+  if (
+    /^(apa\s+itu|bagaimana\s+cara|gimana\s+cara|apakah\s+bisa|cara\s+)/i.test(
+      trimmed,
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    /\b(input|catat|tambah|laporkan|update|isi|simpan)\s+(?:data\s+)?(?:laporan\s+harian|daily\s+report|progres(?:\s+harian|\s+proyek)?)\b/i.test(
+      trimmed,
+    ) ||
+    /\bupdate\s+progres\b/i.test(trimmed)
+  ) {
+    return "DAILY_REPORT";
+  }
+
+  if (
+    /\b(input|buat|buatkan|ajukan|tambah|bikin|bikinkan)\s+(?:data\s+)?(?:tiket|ticket|pengajuan(?:\s+(?:material|biaya|operasional|kasbon|reimburse))?)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return "CREATE_TICKET";
+  }
+
+  if (
+    /\b(input|buat|simpan|catat|tulis)\s+(?:catatan|note|notes|pengingat|reminder)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return "CREATE_NOTE";
+  }
+
+  return null;
+}
+
+async function resolveProjectForPrompt(
+  message: string,
+  explicitProjectId?: string | null,
+) {
+  if (explicitProjectId && explicitProjectId !== "NONE") {
+    const exact = await prisma.project.findFirst({
+      where: { id: explicitProjectId, isDeleted: false },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        title: true,
+        kelompokTani: true,
+        progress: true,
+        status: true,
+      },
+    });
+    if (exact) return exact;
+  }
+
+  const candidates = await prisma.project.findMany({
+    where: { isDeleted: false },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      title: true,
+      kelompokTani: true,
+      progress: true,
+      status: true,
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 60,
+  });
+
+  const lowerMsg = message.toLowerCase();
+  let bestMatch: (typeof candidates)[number] | null = null;
+  let bestScore = 0;
+
+  for (const project of candidates) {
+    const terms = [project.code, project.name, project.title, project.kelompokTani]
+      .filter(Boolean)
+      .map((t) => t.toLowerCase().trim());
+    for (const term of terms) {
+      if (term.length >= 3 && lowerMsg.includes(term) && term.length > bestScore) {
+        bestScore = term.length;
+        bestMatch = project;
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
+async function allocateNextTicketNumber(): Promise<string> {
+  const now = new Date();
+  const month = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const prefix = `TKT-${month}-`;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const seq = await prisma.documentNumberSequence.upsert({
+      where: { kind_year: { kind: prefix, year: 0 } },
+      update: { value: { increment: 1 } },
+      create: { kind: prefix, year: 0, value: 1 },
+      select: { value: true },
+    });
+    const candidate = `${prefix}${String(seq.value).padStart(3, "0")}`;
+    const clash = await prisma.ticket.findUnique({
+      where: { ticketNumber: candidate },
+      select: { id: true },
+    });
+    if (!clash) return candidate;
+  }
+
+  return `${prefix}${Date.now().toString().slice(-4)}`;
+}
+
+async function executeErpDataInputAction(params: {
+  actionType: ChatDataActionType;
+  message: string;
+  projectId?: string | null;
+  dataInput?: ErpDataInputPayload | null;
+  user: {
+    id: string;
+    name: string;
+    role: string;
+  };
+}): Promise<{
+  content: string;
+  result: ChatDataActionResult | null;
+}> {
+  const { actionType, message, projectId, dataInput, user } = params;
+
+  if (actionType === "CREATE_NOTE") {
+    const rawNote =
+      dataInput?.notes?.trim() ||
+      dataInput?.title?.trim() ||
+      message
+        .replace(
+          /^(?:@(?:bunglon|skala|assistant|hermes|ai)\s+)?(?:tolong\s+|bantu\s+)?(?:input|buat|simpan|catat|tulis)\s+(?:catatan|note|notes|pengingat|reminder)\s*[:\-]?\s*/i,
+          "",
+        )
+        .trim();
+
+    if (!rawNote || rawNote.length < 2) {
+      return {
+        content:
+          "Boleh sebutkan isi catatan yang mau saya simpan? Contohnya: *\"Catat: besok cek pengiriman semen di proyek Ine Kreatif jam 09.00\"*.",
+        result: null,
+      };
+    }
+
+    await prisma.userNote.create({
+      data: {
+        userId: user.id,
+        title: rawNote.slice(0, 1000),
+        color: "primary",
+      },
+    });
+
+    const summaryText = rawNote.slice(0, 220);
+    return {
+      content: [
+        `Siap **${user.name}**, catatan kerja Anda sudah langsung saya simpan ke menu **Catatan** ya! 📝`,
+        "",
+        `> "${summaryText}"`,
+        "",
+        "Anda bisa membukanya kapan saja lewat kartu konfirmasi di bawah ini.",
+      ].join("\n"),
+      result: {
+        actionType: "CREATE_NOTE",
+        title: "Catatan Kerja Berhasil Disimpan",
+        referenceCode: "CATATAN",
+        summary: summaryText,
+        targetUrl: "/apps/notes",
+      },
+    };
+  }
+
+  if (actionType === "DAILY_REPORT") {
+    const allowedReportRoles = new Set<string>([
+      UserRole.DIRECTOR,
+      UserRole.DEPUTY_DIRECTOR,
+      UserRole.ADMINISTRATIONS,
+      UserRole.KOORDINATOR,
+      UserRole.FIELD_TEAM,
+    ]);
+    if (!allowedReportRoles.has(user.role)) {
+      return {
+        content: `Maaf **${user.name}**, input Laporan Harian proyek saat ini hanya dibuka untuk peran Direksi, Administrasi, Koordinator Lapangan, atau Tim Lapangan.`,
+        result: null,
+      };
+    }
+
+    const project = await resolveProjectForPrompt(
+      message,
+      dataInput?.projectId ?? projectId,
+    );
+    if (!project) {
+      const topList = await prisma.project.findMany({
+        where: { isDeleted: false },
+        select: { code: true, title: true },
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+      });
+      const sampleNames = topList
+        .map((p) => `- **${p.title}** (\`${p.code}\`)`)
+        .join("\n");
+      return {
+        content: [
+          "Siap, saya bantu catat laporan hariannya! Boleh info **nama atau kode proyeknya** yang mana ya?",
+          sampleNames ? `\nBeberapa proyek aktif saat ini:\n${sampleNames}` : "",
+          "\nContoh: *\"Input laporan harian proyek Ine Kreatif progres 48% 12 pekerja cerah pemasangan batu selesai\"*.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        result: null,
+      };
+    }
+
+    const progressMatch = message.match(/(\d{1,3}(?:[.,]\d+)?)\s*%/);
+    const parsedProgress =
+      typeof dataInput?.progress === "number" && Number.isFinite(dataInput.progress)
+        ? dataInput.progress
+        : progressMatch
+          ? Number(progressMatch[1].replace(",", "."))
+          : null;
+    const nextProgress =
+      parsedProgress !== null && Number.isFinite(parsedProgress)
+        ? Math.max(0, Math.min(100, parsedProgress))
+        : Number(project.progress ?? 0);
+
+    const workersMatch = message.match(/(\d{1,4})\s*(?:pekerja|tukang|orang)/i);
+    const workersCount =
+      typeof dataInput?.workersCount === "number" &&
+      Number.isFinite(dataInput.workersCount)
+        ? Math.max(0, Math.round(dataInput.workersCount))
+        : workersMatch
+          ? Math.max(0, Number(workersMatch[1]))
+          : 0;
+
+    let weather = dataInput?.weather?.trim() || "";
+    if (!weather) {
+      if (/\bhujan\b/i.test(message)) weather = "Hujan";
+      else if (/\bberawan|mendung\b/i.test(message)) weather = "Berawan";
+      else weather = "Cerah";
+    }
+
+    const cleanedSummary =
+      dataInput?.notes?.trim() ||
+      message
+        .replace(
+          /^(?:@(?:bunglon|skala|assistant|hermes|ai)\s+)?(?:tolong\s+|bantu\s+)?(?:input|catat|tambah|laporkan|update|isi)\s+(?:data\s+)?(?:laporan\s+harian|daily\s+report|progres(?:\s+harian|\s+proyek)?)\s*/i,
+          "",
+        )
+        .trim() ||
+      `Update laporan harian proyek ${project.title}`;
+
+    const dateKey =
+      toJakartaDateKey(new Date()) ??
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    const reportDateStart = toJakartaDayStartDate(dateKey);
+    const { start, endExclusive } = getJakartaDayRange(dateKey);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.dailyReport.findFirst({
+        where: {
+          projectId: project.id,
+          reportDate: { gte: start, lt: endExclusive },
+        },
+        select: {
+          id: true,
+          workersCount: true,
+          workSummary: true,
+        },
+      });
+
+      if (existing) {
+        const mergedSummary = existing.workSummary
+          ? existing.workSummary.includes(cleanedSummary)
+            ? existing.workSummary
+            : `${existing.workSummary}\n• [Via Bunglon AI]: ${cleanedSummary}`
+          : cleanedSummary;
+        await tx.dailyReport.update({
+          where: { id: existing.id },
+          data: {
+            weather,
+            workersCount:
+              workersCount > 0 ? workersCount : existing.workersCount,
+            progress: nextProgress,
+            workSummary: mergedSummary.slice(0, 4000),
+          },
+        });
+      } else {
+        await tx.dailyReport.create({
+          data: {
+            projectId: project.id,
+            reportDate: reportDateStart,
+            weather,
+            workersCount,
+            progress: nextProgress,
+            workSummary: cleanedSummary.slice(0, 4000),
+          },
+        });
+      }
+
+      const nextStatus =
+        project.status === ProjectStatus.PENDING_SETUP ||
+        project.status === ProjectStatus.PENDING
+          ? ProjectStatus.ON_PROGRESS
+          : project.status;
+
+      await tx.project.update({
+        where: { id: project.id },
+        data: {
+          progress: nextProgress,
+          status: nextStatus,
+        },
+      });
+    });
+
+    const summaryLine = `${project.title} · Progres ${nextProgress.toFixed(1)}% · ${workersCount} pekerja · Cuaca ${weather}`;
+    return {
+      content: [
+        `Beres **${user.name}**! Laporan harian & progres proyek **${project.title}** (\`${project.code}\`) untuk tanggal **${dateKey}** sudah berhasil saya catat ke database 👍`,
+        "",
+        `- **Progres Fisik Terkini:** ${nextProgress.toFixed(1)}%`,
+        workersCount > 0 ? `- **Tenaga Kerja:** ${workersCount} pekerja` : null,
+        `- **Cuaca:** ${weather}`,
+        `- **Ringkasan Pekerjaan:** ${cleanedSummary.slice(0, 300)}`,
+        "",
+        "Kalau mau sekalian dibuatkan **Laporan Proyek PDF** atau **BAST**, tinggal bilang saja ya.",
+      ]
+        .filter((line) => line !== null)
+        .join("\n"),
+      result: {
+        actionType: "DAILY_REPORT",
+        title: "Laporan Harian Proyek Tersimpan",
+        referenceCode: project.code,
+        summary: summaryLine,
+        targetUrl: "/apps/projects",
+      },
+    };
+  }
+
+  // CREATE_TICKET
+  const project = await resolveProjectForPrompt(
+    message,
+    dataInput?.projectId ?? projectId,
+  );
+  const extractedAmount =
+    typeof dataInput?.amount === "number" &&
+    Number.isFinite(dataInput.amount) &&
+    dataInput.amount > 0
+      ? Math.round(dataInput.amount)
+      : extractAmountFromPrompt(message) ?? 0;
+
+  let ticketTitle =
+    dataInput?.title?.trim() ||
+    message
+      .replace(
+        /^(?:@(?:bunglon|skala|assistant|hermes|ai)\s+)?(?:tolong\s+|bantu\s+)?(?:input|buat|buatkan|ajukan|tambah|bikin|bikinkan)\s+(?:data\s+)?(?:tiket|ticket|pengajuan)\s*/i,
+        "",
+      )
+      .trim();
+
+  if (ticketTitle.length > 140) {
+    ticketTitle = `${ticketTitle.slice(0, 137)}...`;
+  }
+  if (ticketTitle.length < 3) {
+    return {
+      content:
+        "Boleh beri tahu **judul/keperluan pengajuan tiketnya** ya? Contoh: *\"Input tiket pengajuan pembelian 50 sak semen untuk proyek Ine Kreatif Rp 3.750.000\"*.",
+      result: null,
+    };
+  }
+
+  const categoryHint = (dataInput?.category || message).toLowerCase();
+  const ticketType: TicketType =
+    /\b(material|semen|besi|pasir|batu|bahan|pipa|kawat|bbm|alat)\b/i.test(
+      categoryHint,
+    )
+      ? TicketType.MATERIAL
+      : /\b(biaya|kasbon|reimburse|bayar|upah|sewa|dana|uang|cost)\b/i.test(
+            categoryHint,
+          )
+        ? TicketType.COST
+        : TicketType.OPERATIONAL;
+
+  const requestCategory: TicketRequestCategory =
+    ticketType === TicketType.MATERIAL
+      ? TicketRequestCategory.MATERIAL
+      : /\bkasbon\b/i.test(categoryHint)
+        ? TicketRequestCategory.KASBON
+        : /\breimburse\b/i.test(categoryHint)
+          ? TicketRequestCategory.REIMBURSEMENT
+          : ticketType === TicketType.COST
+            ? TicketRequestCategory.OPERATING_EXPENSE
+            : TicketRequestCategory.OPS;
+
+  const priority: TicketPriority = /\b(urgent|mendesak|segera|darurat)\b/i.test(
+    message,
+  )
+    ? TicketPriority.URGENT
+    : /\b(high|penting|prioritas)\b/i.test(message)
+      ? TicketPriority.HIGH
+      : TicketPriority.MEDIUM;
+
+  const ticketNumber = await allocateNextTicketNumber();
+  const descriptionText =
+    dataInput?.notes?.trim() ||
+    `Pengajuan dibuat via Bunglon Assistant oleh ${user.name}: ${message}`;
+
+  await prisma.ticket.create({
+    data: {
+      id: randomUUID(),
+      ticketNumber,
+      title: ticketTitle,
+      description: descriptionText.slice(0, 4000),
+      type: ticketType,
+      requestCategory,
+      priority,
+      status: TicketStatus.PENDING_DIRECTOR,
+      requestedAmount: extractedAmount > 0 ? extractedAmount : null,
+      totalAmount:
+        extractedAmount > 0
+          ? scaledIntegerFromDecimal(extractedAmount.toFixed(2))
+          : null,
+      requesterId: user.id,
+      projectId: project?.id ?? null,
+      updatedAt: new Date(),
+      auditLogs: {
+        create: {
+          id: randomUUID(),
+          userId: user.id,
+          action: "CREATED_VIA_BUNGLON_AI",
+          notes: `Tiket diajukan melalui Bunglon Assistant (SKALA AI) oleh ${user.name}.`,
+        },
+      },
+    },
+  });
+
+  try {
+    await sendNotification({
+      roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+      title: `Tiket Baru ${ticketNumber} · Menunggu Persetujuan`,
+      message: `${user.name} mengajukan ${ticketTitle}${extractedAmount > 0 ? ` (${formatRupiah(extractedAmount)})` : ""} melalui Bunglon Assistant.`,
+      actionUrl: "/apps/approvals",
+    });
+  } catch (notifyErr) {
+    console.warn("[Bunglon Ticket Notify] Notification skipped:", notifyErr);
+  }
+
+  const summaryParts = [
+    ticketTitle,
+    extractedAmount > 0 ? formatRupiah(extractedAmount) : null,
+    project ? project.title : null,
+  ].filter(Boolean);
+
+  return {
+    content: [
+      `Siap **${user.name}**! Tiket pengajuan baru berhasil saya daftarkan ke sistem dengan nomor **\`${ticketNumber}\`** ✅`,
+      "",
+      `- **Judul:** ${ticketTitle}`,
+      `- **Jenis / Prioritas:** ${ticketType} · ${priority}`,
+      extractedAmount > 0
+        ? `- **Estimasi Nilai:** ${formatRupiah(extractedAmount)}`
+        : null,
+      project ? `- **Proyek Terkait:** ${project.title} (\`${project.code}\`)` : null,
+      `- **Status Saat Ini:** Menunggu persetujuan Direksi (\`PENDING_DIRECTOR\`)`,
+    ]
+      .filter((line) => line !== null)
+      .join("\n"),
+    result: {
+      actionType: "CREATE_TICKET",
+      title: "Tiket Pengajuan Berhasil Dibuat",
+      referenceCode: ticketNumber,
+      summary: summaryParts.join(" · "),
+      targetUrl: "/apps/tickets",
+    },
+  };
+}
+
+export async function runBunglonAssistantTurn(input: {
+  message: string;
+  user: { id: string; name: string; role: string };
+  projectId?: string | null;
+  ticketId?: string | null;
+  docType?: HermesDocType | null;
+  docParams?: HermesDocParams | null;
+  dataInput?: ErpDataInputPayload | null;
+  conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+  customGatewayUrl?: string | null;
+  customApiKey?: string | null;
+  verificationBaseUrl: URL;
+  isGroupContext?: boolean;
+  groupChannelName?: string | null;
+}): Promise<BunglonTurnResult> {
+  const cleanedPrompt = input.message
+    .replace(/^@(?:bunglon|skala|assistant|hermes|ai)\b[:,]?\s*/i, "")
+    .trim();
+  const promptForIntent = cleanedPrompt || input.message.trim();
+
+  const [erpContext, gatewayStatus] = await Promise.all([
+    loadErpContextSummary(input.projectId, input.ticketId),
+    checkHermesGatewayStatus(input.customGatewayUrl, input.customApiKey),
+  ]);
+
+  const dataActionType = detectDataInputActionType(
+    promptForIntent,
+    input.dataInput,
+  );
+  if (dataActionType) {
+    const execResult = await executeErpDataInputAction({
+      actionType: dataActionType,
+      message: promptForIntent,
+      projectId: input.projectId ?? input.dataInput?.projectId ?? null,
+      dataInput: input.dataInput,
+      user: input.user,
+    });
+    const thinkingSteps = buildThinkingSteps({
+      intentType: "data_input",
+      actionType: dataActionType,
+      projectName: erpContext.selectedProject?.title ?? null,
+      usedAiModel: false,
+    });
+    return {
+      assistantContent: execResult.content,
+      attachments: [],
+      generatedDocument: null,
+      dataActionResult: execResult.result,
+      thinkingSteps,
+      engineUsed: gatewayStatus.gatewayOnline
+        ? "hermes-gateway"
+        : "hermes-builtin-erp",
+      gatewayStatus,
+    };
+  }
+
+  const intent = detectDocumentIntent(promptForIntent, input.docType);
+  if (intent.isDocumentRequest && intent.docType) {
+    const generated = await generateHermesDocument({
+      docType: intent.docType,
+      prompt: promptForIntent,
+      projectId: input.projectId,
+      ticketId: input.ticketId,
+      docParams: input.docParams,
+      user: input.user,
+      verificationBaseUrl: input.verificationBaseUrl,
+      erpContext,
+      gatewayStatus,
+      detectedIntent: intent,
+      customGatewayUrl: input.customGatewayUrl,
+      customApiKey: input.customApiKey,
+    });
+
+    const generatedDocument = generated.document;
+    const attachment: ChatAttachmentItem = {
+      id: generatedDocument._id,
+      title: `${generatedDocument.title} (${generatedDocument.documentNumber})`,
+      kind: "DOCUMENT",
+      docType: generatedDocument.docType,
+      documentNumber: generatedDocument.documentNumber,
+      url: `/api/chat/hermes/document/${generatedDocument._id}?format=html`,
+      downloadUrl: `/api/chat/hermes/document/${generatedDocument._id}?format=pdf&download=1`,
+      mimeType: "application/pdf",
+      summary: generatedDocument.summary,
+      documentId: generatedDocument._id,
+    };
+
+    const assistantContent = [
+      `Siap **${input.user.name}**, dokumen **${generatedDocument.title}** sudah beres saya susun dengan nomor **\`${generatedDocument.documentNumber}\`** 📄`,
+      generatedDocument.projectName
+        ? `- **Proyek:** ${generatedDocument.projectName}`
+        : null,
+      generatedDocument.recipientName
+        ? `- **Pihak / Tujuan:** ${generatedDocument.recipientName}`
+        : null,
+      generatedDocument.amount !== null
+        ? `- **Nominal:** ${formatRupiah(generatedDocument.amount)}`
+        : null,
+      "",
+      input.isGroupContext
+        ? "Dokumennya langsung saya lampirkan di grup ini ya, silakan dicek atau dicetak!"
+        : "Silakan buka pratinjau cetak A4 atau langsung kirim ke rekan/grup lewat tombol pada kartu di bawah.",
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
+
+    const thinkingSteps = buildThinkingSteps({
+      intentType: "document",
+      docType: generatedDocument.docType,
+      projectName: generatedDocument.projectName,
+      usedAiModel: generated.engineUsed === "hermes-gateway",
+    });
+
+    return {
+      assistantContent,
+      attachments: [attachment],
+      generatedDocument,
+      dataActionResult: null,
+      thinkingSteps,
+      engineUsed: generated.engineUsed,
+      gatewayStatus,
+    };
+  }
+
+  const groupContextInstruction = input.isGroupContext
+    ? `Konteks Grup Chat: Kamu baru saja dipanggil di kanal "${input.groupChannelName || "Grup Koordinasi"}" oleh ${input.user.name}. Ikutlah mengobrol dengan gaya bahasa alami seperti rekan kerja satu tim yang akrab, responsif, dan langsung menjawab pertanyaan atau mengirim ringkasan data ERP yang diminta.`
+    : undefined;
+
+  const gatewayReply = gatewayStatus.gatewayOnline
+    ? await callHermesGateway({
+        message: promptForIntent,
+        erpContext,
+        userName: input.user.name,
+        userRole: input.user.role,
+        conversationHistory: input.conversationHistory,
+        customGatewayUrl: input.customGatewayUrl,
+        customApiKey: input.customApiKey,
+        systemInstructionExtra: groupContextInstruction,
+      })
+    : null;
+
+  const engineUsed: "hermes-gateway" | "hermes-builtin-erp" = gatewayReply
+    ? "hermes-gateway"
+    : "hermes-builtin-erp";
+
+  const assistantContent =
+    gatewayReply ||
+    buildBuiltinErpReply(promptForIntent, erpContext, gatewayStatus);
+
+  const thinkingSteps = buildThinkingSteps({
+    intentType: "chat",
+    projectName: erpContext.selectedProject?.title ?? null,
+    usedAiModel: Boolean(gatewayReply),
+  });
+
+  return {
+    assistantContent,
+    attachments: [],
+    generatedDocument: null,
+    dataActionResult: null,
+    thinkingSteps,
+    engineUsed,
+    gatewayStatus,
+  };
 }

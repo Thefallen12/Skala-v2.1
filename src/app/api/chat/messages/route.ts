@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { NotificationType } from "@prisma/client";
 import { auth } from "@/../auth";
+import {
+  getRequestOrigin,
+  resolvePublicAppUrl,
+} from "@/lib/documents/public-app-url";
+import { runBunglonAssistantTurn } from "@/lib/hermes/hermes-engine";
 import { connectToMongoDB } from "@/lib/mongoose";
 import { sendNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +15,8 @@ import {
   type ChatAttachmentKind,
   type ChatMessageDocument,
   ChatMessageModel,
+  type ChatPresenceDocument,
+  ChatPresenceModel,
   type ChatRoomDocument,
   ChatRoomModel,
   type ChatRoomType,
@@ -335,18 +342,30 @@ export async function GET(request: NextRequest) {
       { returnDocument: "after" },
     ).lean<ChatRoomDocument | null>();
 
-    const recentMessages = await ChatMessageModel.find({
-      roomId: String(resolution.room._id),
-    })
-      .sort({ createdAt: -1 })
-      .limit(150)
-      .lean<ChatMessageDocument[]>();
+    const [recentMessages, typingDocs] = await Promise.all([
+      ChatMessageModel.find({
+        roomId: String(resolution.room._id),
+      })
+        .sort({ createdAt: -1 })
+        .limit(150)
+        .lean<ChatMessageDocument[]>(),
+      ChatPresenceModel.find({
+        typingInRoomId: String(resolution.room._id),
+        userId: { $ne: userId },
+        typingUpdatedAt: { $gte: new Date(Date.now() - 8_000) },
+      }).lean<ChatPresenceDocument[]>(),
+    ]);
 
     recentMessages.reverse();
 
     return NextResponse.json({
       room: serializeRoom(updatedRoom ?? resolution.room, userId),
       messages: recentMessages.map(serializeMessage),
+      typingUsers: typingDocs.map((doc) => ({
+        userId: doc.userId,
+        userName: doc.userName,
+        userRole: doc.userRole,
+      })),
     });
   } catch (error) {
     console.error("[Chat Messages GET] Gagal memuat pesan:", error);
@@ -388,6 +407,10 @@ export async function POST(request: NextRequest) {
     targetUserId?: unknown;
     content?: unknown;
     attachments?: unknown;
+    invokeAssistant?: unknown;
+    projectId?: unknown;
+    customGatewayUrl?: unknown;
+    customApiKey?: unknown;
   };
 
   const roomId = typeof payload.roomId === "string" ? payload.roomId : null;
@@ -506,9 +529,31 @@ export async function POST(request: NextRequest) {
       updateQuery.$inc = incFields;
     }
 
-    const updatedRoom = await ChatRoomModel.findByIdAndUpdate(room._id, updateQuery, {
-      returnDocument: "after",
-    }).lean<ChatRoomDocument | null>();
+    let updatedRoom = await ChatRoomModel.findByIdAndUpdate(
+      room._id,
+      updateQuery,
+      {
+        returnDocument: "after",
+      },
+    ).lean<ChatRoomDocument | null>();
+
+    await ChatPresenceModel.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: {
+          _id: userId,
+          userId,
+        },
+        $set: {
+          userName: senderName.slice(0, 160),
+          userRole: String(senderRole).slice(0, 64),
+          lastActiveAt: now,
+          typingInRoomId: null,
+          typingUpdatedAt: null,
+        },
+      },
+      { upsert: true, returnDocument: "after" },
+    );
 
     if (room.type === "DIRECT") {
       const directRecipientId = room.participantIds.find((id) => id && id !== userId);
@@ -530,13 +575,132 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const shouldInvokeAssistant =
+      Boolean(trimmedContent) &&
+      (payload.invokeAssistant === true ||
+        /@(?:bunglon|skala|assistant|hermes|ai)\b/i.test(trimmedContent) ||
+        /^(?:bunglon|skala)\b[,:\s]/i.test(trimmedContent));
+
+    let serializedAssistantMessage: ChatMessageDto | null = null;
+    if (shouldInvokeAssistant && room.type !== "HERMES") {
+      try {
+        const recentHistory = await ChatMessageModel.find({
+          roomId: String(room._id),
+          _id: { $ne: createdMessage._id },
+        })
+          .sort({ createdAt: -1 })
+          .limit(6)
+          .lean<ChatMessageDocument[]>();
+
+        const conversationHistory = recentHistory
+          .reverse()
+          .map((m) => ({
+            role: (m.senderId === "hermes-assistant" ? "assistant" : "user") as
+              | "user"
+              | "assistant",
+            content:
+              m.senderId === "hermes-assistant"
+                ? String(m.content ?? "")
+                : `${m.senderName}: ${String(m.content ?? "")}`,
+          }))
+          .filter((m) => m.content.trim().length > 0);
+
+        const verificationBaseUrl =
+          resolvePublicAppUrl(getRequestOrigin(request.headers)) ??
+          new URL(request.nextUrl.origin);
+
+        const turn = await runBunglonAssistantTurn({
+          message: trimmedContent,
+          user: {
+            id: userId,
+            name: senderName,
+            role: String(senderRole),
+          },
+          projectId:
+            typeof payload.projectId === "string" && payload.projectId.trim()
+              ? payload.projectId.trim()
+              : null,
+          conversationHistory,
+          customGatewayUrl:
+            typeof payload.customGatewayUrl === "string"
+              ? payload.customGatewayUrl.trim()
+              : null,
+          customApiKey:
+            typeof payload.customApiKey === "string"
+              ? payload.customApiKey.trim()
+              : null,
+          verificationBaseUrl,
+          isGroupContext: room.type === "CHANNEL",
+          groupChannelName: room.name,
+        });
+
+        const assistantTime = new Date();
+        const assistantMsgDoc = await ChatMessageModel.create({
+          _id: randomUUID(),
+          roomId: String(room._id),
+          senderId: "hermes-assistant",
+          senderName: "Bunglon Assistant (SKALA AI)",
+          senderRole: "BUNGLON_AI",
+          senderAvatarUrl: null,
+          content: turn.assistantContent.slice(0, 8000),
+          attachments: turn.attachments,
+          metadata: {
+            engineUsed: turn.engineUsed,
+            gatewayOnline: turn.gatewayStatus.gatewayOnline,
+            gatewayUrl: turn.gatewayStatus.gatewayUrl,
+            thinkingSteps: turn.thinkingSteps,
+            dataActionResult: turn.dataActionResult,
+            docType: turn.generatedDocument?.docType ?? null,
+            documentId: turn.generatedDocument?._id ?? null,
+            documentNumber: turn.generatedDocument?.documentNumber ?? null,
+          },
+          readByIds: [userId],
+          createdAt: assistantTime,
+          updatedAt: assistantTime,
+        });
+
+        const assistantPreview = buildMessagePreview(
+          turn.assistantContent,
+          turn.attachments,
+        );
+        const roomAfterAssistant = await ChatRoomModel.findByIdAndUpdate(
+          room._id,
+          {
+            $set: {
+              lastMessageText: assistantPreview,
+              lastMessageAt: assistantTime,
+              lastMessageSenderId: "hermes-assistant",
+              lastMessageSenderName: "Bunglon Assistant (SKALA AI)",
+            },
+          },
+          { returnDocument: "after" },
+        ).lean<ChatRoomDocument | null>();
+
+        if (roomAfterAssistant) {
+          updatedRoom = roomAfterAssistant;
+        }
+        serializedAssistantMessage = serializeMessage(
+          assistantMsgDoc.toObject() as ChatMessageDocument,
+        );
+      } catch (assistantError) {
+        console.error(
+          "[Chat Messages POST] Bunglon Assistant group reply failed:",
+          assistantError,
+        );
+      }
+    }
+
     const serializedMessage = serializeMessage(
       createdMessage.toObject() as ChatMessageDocument,
     );
     const serializedRoom = serializeRoom(updatedRoom ?? room, userId);
 
     return NextResponse.json(
-      { room: serializedRoom, message: serializedMessage },
+      {
+        room: serializedRoom,
+        message: serializedMessage,
+        assistantMessage: serializedAssistantMessage,
+      },
       { status: 201 },
     );
   } catch (error) {

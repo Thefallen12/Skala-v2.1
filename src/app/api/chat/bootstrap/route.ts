@@ -8,6 +8,8 @@ import {
   ChatGeneratedDocumentModel,
   type ChatGeneratedDocumentRecord,
   ChatMessageModel,
+  type ChatPresenceDocument,
+  ChatPresenceModel,
   ChatRoomModel,
   type ChatRoomDocument,
   type ChatRoomType,
@@ -53,15 +55,15 @@ const DEFAULT_TEAM_CHANNELS = [
 ] as const;
 
 const HERMES_WELCOME_CONTENT = [
-  "Halo! Saya **Hermes Assistant**, asisten AI resmi untuk operasional & administrasi **Skala Prioritas Engineering**.",
+  "Halo! Saya **Bunglon Assistant (SKALA AI)** — rekan kerja asisten cerdas Anda di **PT Skala Prioritas Engineering** 👋",
   "",
-  "Saya dapat membantu Anda menyusun dan mencetak dokumen kerja otomatis langsung dari percakapan ini, antara lain:",
-  "- **Kwitansi & Lampiran Bon Keuangan** (bon lapangan, kasbon, reimburse, bukti transfer)",
-  "- **SPK (Surat Perintah Kerja)** & **BAST (Berita Acara Serah Terima)**",
-  "- **Purchase Order (PO)** & **Surat Jalan / Delivery Order (DO)**",
-  "- **Laporan Progres Proyek** & **Memo / Surat Resmi Perusahaan**",
+  "Saya siap ngobrol santai sekaligus membantu pekerjaan Anda, antara lain:",
+  "- **Menjawab & mengecek data real-time** proyek, progres Kurva-S, tiket pengajuan, dan stok gudang",
+  "- **Membantu menginput data ke ERP**, seperti Laporan Harian Proyek, Pengajuan Tiket Baru, dan Catatan Kerja",
+  "- **Membuat & mencetak dokumen resmi PDF A4** (Kwitansi, Lampiran Bon, SPK, BAST, PO, Surat Jalan, Laporan Proyek, & Surat Resmi)",
+  "- **Ikut berdiskusi di grup chat tim** — cukup ketik **`@bunglon`** atau **`@skala`** di dalam kanal divisi!",
   "",
-  "Saya juga terhubung dengan gateway **NousResearch Hermes CLI** untuk analisis teks dan penyusunan draf dokumen cepat. Pilih proyek atau tiket terkait jika diperlukan, lalu tuliskan instruksi Anda!",
+  "Silakan tulis kebutuhan Anda di bawah atau pilih tombol cepat yang tersedia ya.",
 ].join("\n");
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -185,6 +187,22 @@ export async function GET() {
   try {
     await connectToMongoDB();
 
+    await ChatPresenceModel.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: {
+          _id: userId,
+          userId,
+        },
+        $set: {
+          userName: (session.user.name ?? "Pengguna").slice(0, 160),
+          userRole: String(session.user.role || "FIELD_TEAM").slice(0, 64),
+          lastActiveAt: new Date(),
+        },
+      },
+      { upsert: true, returnDocument: "after" },
+    );
+
     await Promise.all(
       DEFAULT_TEAM_CHANNELS.map((channel) =>
         upsertRoomByKey({
@@ -201,10 +219,22 @@ export async function GET() {
     const { room: ensuredHermesRoom, created: hermesCreated } = await upsertRoomByKey({
       roomKey: hermesRoomKey,
       type: "HERMES",
-      name: "Hermes Assistant",
-      description: "Asisten AI Dokumen, Lampiran Keuangan & Operasional",
+      name: "Bunglon Assistant (SKALA AI)",
+      description: "Asisten Cerdas Input Data, Dokumen & Koordinasi Tim ERP",
       participantIds: [userId],
     });
+
+    if (!hermesCreated && ensuredHermesRoom.name === "Hermes Assistant") {
+      await ChatRoomModel.updateOne(
+        { _id: ensuredHermesRoom._id },
+        {
+          $set: {
+            name: "Bunglon Assistant (SKALA AI)",
+            description: "Asisten Cerdas Input Data, Dokumen & Koordinasi Tim ERP",
+          },
+        },
+      );
+    }
 
     if (hermesCreated) {
       const existingMessages = await ChatMessageModel.countDocuments({
@@ -212,7 +242,7 @@ export async function GET() {
       });
       if (existingMessages === 0) {
         const welcomePreview =
-          "Halo! Saya Hermes Assistant, siap bantu buat Kwitansi, SPK, BAST, PO, & Laporan.";
+          "Halo! Saya Bunglon Assistant (SKALA AI), siap bantu input data, jawab pertanyaan, & buat laporan PDF.";
         await ChatMessageModel.findOneAndUpdate(
           {
             roomId: String(ensuredHermesRoom._id),
@@ -223,8 +253,8 @@ export async function GET() {
               _id: randomUUID(),
               roomId: String(ensuredHermesRoom._id),
               senderId: "hermes-assistant",
-              senderName: "Hermes Assistant",
-              senderRole: "AI_ASSISTANT",
+              senderName: "Bunglon Assistant (SKALA AI)",
+              senderRole: "BUNGLON_AI",
               senderAvatarUrl: null,
               content: HERMES_WELCOME_CONTENT,
               attachments: [],
@@ -241,7 +271,7 @@ export async function GET() {
               lastMessageText: welcomePreview,
               lastMessageAt: new Date(),
               lastMessageSenderId: "hermes-assistant",
-              lastMessageSenderName: "Hermes Assistant",
+              lastMessageSenderName: "Bunglon Assistant (SKALA AI)",
             },
           },
         );
@@ -250,6 +280,7 @@ export async function GET() {
 
     const [
       activeUsers,
+      presenceDocs,
       channelDocs,
       directDocs,
       hermesDoc,
@@ -269,6 +300,7 @@ export async function GET() {
         },
         orderBy: { name: "asc" },
       }),
+      ChatPresenceModel.find().lean<ChatPresenceDocument[]>(),
       ChatRoomModel.find({ type: "CHANNEL" })
         .sort({ lastMessageAt: -1 })
         .lean<ChatRoomDocument[]>(),
@@ -309,15 +341,47 @@ export async function GET() {
         .lean<Omit<ChatGeneratedDocumentRecord, "htmlContent">[]>(),
     ]);
 
+    const ONLINE_THRESHOLD_MS = 120_000;
+    const TYPING_THRESHOLD_MS = 8_000;
+    const nowMs = Date.now();
+    const presenceByUserId = new Map<string, ChatPresenceDocument>();
+    for (const doc of presenceDocs) {
+      presenceByUserId.set(doc.userId, doc);
+    }
+
     const users = activeUsers
-      .map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        profilePhotoUrl: u.profilePhotoUrl ?? null,
-        lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : null,
-      }))
+      .map((u) => {
+        const presence = presenceByUserId.get(u.id);
+        const loginMs = u.lastLoginAt ? new Date(u.lastLoginAt).getTime() : 0;
+        const activeMs = presence?.lastActiveAt
+          ? new Date(presence.lastActiveAt).getTime()
+          : 0;
+        const bestMs = Math.max(loginMs, activeMs, u.id === userId ? nowMs : 0);
+        const lastSeenAt = bestMs > 0 ? new Date(bestMs).toISOString() : null;
+        const isOnline =
+          u.id === userId || (bestMs > 0 && nowMs - bestMs <= ONLINE_THRESHOLD_MS);
+        const typingUpdatedMs = presence?.typingUpdatedAt
+          ? new Date(presence.typingUpdatedAt).getTime()
+          : 0;
+        const typingInRoomId =
+          presence?.typingInRoomId &&
+          typingUpdatedMs > 0 &&
+          nowMs - typingUpdatedMs <= TYPING_THRESHOLD_MS
+            ? presence.typingInRoomId
+            : null;
+
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          profilePhotoUrl: u.profilePhotoUrl ?? null,
+          lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : null,
+          lastSeenAt,
+          isOnline,
+          typingInRoomId,
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name, "id"));
 
     const currentUserRecord = users.find((u) => u.id === userId);

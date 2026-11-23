@@ -7,19 +7,15 @@ import {
   resolvePublicAppUrl,
 } from "@/lib/documents/public-app-url";
 import {
-  buildBuiltinErpReply,
-  callHermesGateway,
-  checkHermesGatewayStatus,
-  detectDocumentIntent,
-  generateHermesDocument,
   isHermesDocType,
-  loadErpContextSummary,
+  runBunglonAssistantTurn,
+  type ErpDataInputPayload,
   type HermesDocParams,
 } from "@/lib/hermes/hermes-engine";
 import {
   ChatMessageModel,
   ChatRoomModel,
-  type ChatAttachmentItem,
+  type ChatDataActionType,
   type ChatGeneratedDocumentRecord,
   type ChatMessageDocument,
   type ChatRoomDocument,
@@ -96,8 +92,50 @@ interface HermesChatRequestBody {
   ticketId?: unknown;
   docType?: unknown;
   docParams?: unknown;
+  dataInput?: unknown;
   customGatewayUrl?: unknown;
   customApiKey?: unknown;
+}
+
+const VALID_DATA_ACTION_TYPES = new Set<ChatDataActionType>([
+  "DAILY_REPORT",
+  "CREATE_TICKET",
+  "CREATE_NOTE",
+]);
+
+function parseDataInputPayload(raw: unknown): ErpDataInputPayload | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  const rawAction =
+    typeof record.actionType === "string"
+      ? (record.actionType.trim().toUpperCase() as ChatDataActionType)
+      : null;
+  if (!rawAction || !VALID_DATA_ACTION_TYPES.has(rawAction)) {
+    return null;
+  }
+  return {
+    actionType: rawAction,
+    projectId:
+      typeof record.projectId === "string" ? record.projectId.trim() || null : null,
+    title: typeof record.title === "string" ? record.title.trim() || null : null,
+    category:
+      typeof record.category === "string" ? record.category.trim() || null : null,
+    amount:
+      typeof record.amount === "number" && Number.isFinite(record.amount)
+        ? record.amount
+        : null,
+    progress:
+      typeof record.progress === "number" && Number.isFinite(record.progress)
+        ? record.progress
+        : null,
+    workersCount:
+      typeof record.workersCount === "number" && Number.isFinite(record.workersCount)
+        ? record.workersCount
+        : null,
+    weather:
+      typeof record.weather === "string" ? record.weather.trim() || null : null,
+    notes: typeof record.notes === "string" ? record.notes.trim() || null : null,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -132,9 +170,15 @@ export async function POST(request: NextRequest) {
     explicitDocType = rawDocType;
   }
 
+  const dataInput = parseDataInputPayload(body.dataInput);
+
   const message =
     rawMessage ||
-    (explicitDocType ? `Buatkan dokumen ${explicitDocType}` : "");
+    (explicitDocType
+      ? `Buatkan dokumen ${explicitDocType}`
+      : dataInput
+        ? `Input data ${dataInput.actionType}${dataInput.title ? `: ${dataInput.title}` : ""}`
+        : "");
 
   if (!message) {
     return NextResponse.json(
@@ -192,8 +236,8 @@ export async function POST(request: NextRequest) {
         _id: randomUUID(),
         type: "HERMES",
         roomKey,
-        name: "Hermes Assistant",
-        description: "Asisten AI Dokumen, Lampiran Keuangan & Operasional",
+        name: "Bunglon Assistant (SKALA AI)",
+        description: "Asisten Cerdas Input Data, Dokumen & Koordinasi Tim ERP",
         participantIds: [userId],
         unreadCounts: {},
         lastMessageAt: new Date(),
@@ -228,107 +272,45 @@ export async function POST(request: NextRequest) {
       projectId,
       ticketId,
       docType: explicitDocType,
+      dataActionType: dataInput?.actionType ?? null,
     },
     readByIds: [userId],
   });
 
-  const [erpContext, gatewayStatus] = await Promise.all([
-    loadErpContextSummary(projectId, ticketId),
-    checkHermesGatewayStatus(customGatewayUrl, customApiKey),
-  ]);
+  const verificationBaseUrl =
+    resolvePublicAppUrl(getRequestOrigin(request.headers)) ??
+    new URL(request.nextUrl.origin);
 
-  const intent = detectDocumentIntent(message, explicitDocType);
+  const turn = await runBunglonAssistantTurn({
+    message,
+    user: { id: userId, name: userName, role: userRole },
+    projectId,
+    ticketId,
+    docType: explicitDocType,
+    docParams,
+    dataInput,
+    conversationHistory,
+    customGatewayUrl,
+    customApiKey,
+    verificationBaseUrl,
+  });
 
-  let assistantContent = "";
-  let attachments: ChatAttachmentItem[] = [];
-  let generatedDocument: ChatGeneratedDocumentRecord | null = null;
-  let engineUsed: "hermes-gateway" | "hermes-builtin-erp" = "hermes-builtin-erp";
-
-  if (intent.isDocumentRequest && intent.docType) {
-    const verificationBaseUrl =
-      resolvePublicAppUrl(getRequestOrigin(request.headers)) ??
-      new URL(request.nextUrl.origin);
-
-    const generated = await generateHermesDocument({
-      docType: intent.docType,
-      prompt: message,
-      projectId,
-      ticketId,
-      docParams,
-      user: { id: userId, name: userName, role: userRole },
-      verificationBaseUrl,
-      erpContext,
-      gatewayStatus,
-      detectedIntent: intent,
-      customGatewayUrl,
-      customApiKey,
-    });
-
-    generatedDocument = generated.document;
-    engineUsed = generated.engineUsed;
-
-    const attachment: ChatAttachmentItem = {
-      id: generatedDocument._id,
-      title: `${generatedDocument.title} (${generatedDocument.documentNumber})`,
-      kind: "DOCUMENT",
-      docType: generatedDocument.docType,
-      documentNumber: generatedDocument.documentNumber,
-      url: `/api/chat/hermes/document/${generatedDocument._id}?format=html`,
-      downloadUrl: `/api/chat/hermes/document/${generatedDocument._id}?format=pdf&download=1`,
-      mimeType: "application/pdf",
-      summary: generatedDocument.summary,
-      documentId: generatedDocument._id,
-    };
-    attachments = [attachment];
-
-    assistantContent = [
-      `Dokumen **${generatedDocument.title}** telah berhasil disusun dengan nomor **\`${generatedDocument.documentNumber}\`**.`,
-      generatedDocument.projectName
-        ? `- **Proyek:** ${generatedDocument.projectName}`
-        : null,
-      generatedDocument.recipientName
-        ? `- **Pihak / Tujuan:** ${generatedDocument.recipientName}`
-        : null,
-      generatedDocument.amount !== null
-        ? `- **Nominal:** ${new Intl.NumberFormat("id-ID", {
-            style: "currency",
-            currency: "IDR",
-            maximumFractionDigits: 0,
-          }).format(generatedDocument.amount)}`
-        : null,
-      "",
-      "Silakan buka pratinjau HTML atau unduh PDF A4 siap cetak melalui lampiran dokumen di bawah ini.",
-    ]
-      .filter((line) => line !== null)
-      .join("\n");
-  } else {
-    const gatewayReply = gatewayStatus.gatewayOnline
-      ? await callHermesGateway({
-          message,
-          erpContext,
-          userName,
-          userRole,
-          conversationHistory,
-          customGatewayUrl,
-          customApiKey,
-        })
-      : null;
-
-    if (gatewayReply) {
-      assistantContent = gatewayReply;
-      engineUsed = "hermes-gateway";
-    } else {
-      assistantContent = buildBuiltinErpReply(message, erpContext, gatewayStatus);
-      engineUsed = "hermes-builtin-erp";
-    }
-  }
+  const {
+    assistantContent,
+    attachments,
+    generatedDocument,
+    dataActionResult,
+    thinkingSteps,
+    engineUsed,
+    gatewayStatus,
+  } = turn;
 
   const assistantMessageDoc = await ChatMessageModel.create({
     _id: randomUUID(),
     roomId: roomDoc._id,
     senderId: "hermes-assistant",
-    senderName: "Hermes Assistant",
-    senderRole: "AI_ASSISTANT",
+    senderName: "Bunglon Assistant (SKALA AI)",
+    senderRole: "BUNGLON_AI",
     senderAvatarUrl: null,
     content: assistantContent.slice(0, 8000),
     attachments,
@@ -336,6 +318,8 @@ export async function POST(request: NextRequest) {
       engineUsed,
       gatewayOnline: gatewayStatus.gatewayOnline,
       gatewayUrl: gatewayStatus.gatewayUrl,
+      thinkingSteps,
+      dataActionResult,
       docType: generatedDocument?.docType ?? null,
       documentId: generatedDocument?._id ?? null,
       documentNumber: generatedDocument?.documentNumber ?? null,
@@ -350,7 +334,7 @@ export async function POST(request: NextRequest) {
         lastMessageText: assistantContent.replace(/\s+/g, " ").trim().slice(0, 490),
         lastMessageAt: assistantMessageDoc.createdAt ?? new Date(),
         lastMessageSenderId: "hermes-assistant",
-        lastMessageSenderName: "Hermes Assistant",
+        lastMessageSenderName: "Bunglon Assistant (SKALA AI)",
       },
     },
     { returnDocument: "after" },
@@ -371,6 +355,8 @@ export async function POST(request: NextRequest) {
     generatedDocument: generatedDocument
       ? serializeGeneratedDocumentDto(generatedDocument)
       : null,
+    dataActionResult,
+    thinkingSteps,
     engineUsed,
   });
 }

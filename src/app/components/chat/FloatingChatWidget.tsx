@@ -14,8 +14,11 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  ArrowUpRight,
   Bot,
+  Brain,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -46,10 +49,14 @@ import {
   Upload,
   Users,
   X,
+  Zap,
 } from "lucide-react";
+import Link from "next/link";
 import type { UserRole } from "@prisma/client";
 import type {
   ChatAttachmentItem,
+  ChatDataActionResult,
+  ChatDataActionType,
   ChatRoomType,
   HermesDocType,
 } from "@/models/chat";
@@ -79,6 +86,15 @@ export interface ChatUserDto {
   role: string;
   profilePhotoUrl: string | null;
   lastLoginAt: string | null;
+  lastSeenAt?: string | null;
+  isOnline?: boolean;
+  typingInRoomId?: string | null;
+}
+
+export interface TypingUserDto {
+  userId: string;
+  userName: string;
+  userRole: string;
 }
 
 export interface ChatRoomDto {
@@ -163,11 +179,13 @@ interface ChatBootstrapResponse {
 interface ChatMessagesResponse {
   room: ChatRoomDto;
   messages: ChatMessageDto[];
+  typingUsers?: TypingUserDto[];
 }
 
 interface PostMessageResponse {
   room: ChatRoomDto;
   message: ChatMessageDto;
+  assistantMessage?: ChatMessageDto | null;
 }
 
 interface UploadAttachmentResponse {
@@ -188,6 +206,8 @@ interface HermesGenerateResponse {
   userMessage: ChatMessageDto;
   assistantMessage: ChatMessageDto;
   generatedDocument: GeneratedDocDto | null;
+  dataActionResult?: ChatDataActionResult | null;
+  thinkingSteps?: string[];
   engineUsed: "hermes-gateway" | "hermes-builtin-erp";
 }
 
@@ -227,7 +247,24 @@ const ROLE_LABELS: Record<string, string> = {
   FIELD_TEAM: "Tim Lapangan",
   MOVER: "Mover",
   ADMINISTRATIONS: "Administrasi",
+  BUNGLON_AI: "SKALA Assistant",
+  AI_ASSISTANT: "SKALA Assistant",
 };
+
+const BUNGLON_THINKING_MESSAGES = [
+  "Bunglon lagi membaca pertanyaan Anda...",
+  "Lagi mengecek data proyek, tiket, & stok di MongoDB...",
+  "Sedang merangkai jawaban natural & menyiapkan lampiran...",
+];
+
+const DATA_ACTION_OPTIONS: ReadonlyArray<{
+  value: ChatDataActionType;
+  label: string;
+}> = [
+  { value: "DAILY_REPORT", label: "Laporan Harian & Progres Proyek" },
+  { value: "CREATE_TICKET", label: "Tiket Pengajuan Material / Biaya" },
+  { value: "CREATE_NOTE", label: "Catatan Kerja Baru" },
+];
 
 const UPLOAD_KIND_OPTIONS: ReadonlyArray<{
   value: UploadKind;
@@ -300,10 +337,21 @@ const HERMES_QUICK_PROMPTS: ReadonlyArray<{
   label: string;
   prompt: string;
   openDocForm?: HermesDocType;
+  openDataForm?: ChatDataActionType;
 }> = [
   {
     label: "Ringkas Proyek",
-    prompt: "Ringkas progres semua proyek aktif dan status tiket terbuka saat ini.",
+    prompt: "Bunglon, tolong ringkas progres proyek aktif dan tiket terbuka saat ini ya.",
+  },
+  {
+    label: "Input Laporan",
+    prompt: "",
+    openDataForm: "DAILY_REPORT",
+  },
+  {
+    label: "Ajukan Tiket",
+    prompt: "",
+    openDataForm: "CREATE_TICKET",
   },
   {
     label: "Kwitansi Cepat",
@@ -314,10 +362,6 @@ const HERMES_QUICK_PROMPTS: ReadonlyArray<{
     label: "Lampiran Bon",
     prompt: "",
     openDocForm: "LAMPIRAN_KEUANGAN",
-  },
-  {
-    label: "Laporan Progres",
-    prompt: "Susun ringkasan laporan progres proyek lapangan terbaru untuk direksi.",
   },
 ];
 
@@ -423,6 +467,86 @@ function formatShortRoomTime(iso: string): string {
     day: "numeric",
     month: "short",
   }).format(date);
+}
+
+function formatLastSeen(
+  lastSeenAt?: string | null,
+  isOnline?: boolean,
+): string {
+  if (isOnline) return "Online sekarang";
+  if (!lastSeenAt) return "Offline · Belum aktif";
+  const date = new Date(lastSeenAt);
+  const ms = date.getTime();
+  if (Number.isNaN(ms)) return "Offline";
+
+  const diffMs = Math.max(0, Date.now() - ms);
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 2) return "Offline · Baru saja";
+  if (diffMins < 60) return `Offline · ${diffMins} mnt lalu`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  const nowKey = getJakartaDateKey(new Date());
+  const seenKey = getJakartaDateKey(date);
+  const timeStr = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+
+  if (nowKey === seenKey) {
+    if (diffHours <= 6) return `Offline · ${diffHours} jam lalu`;
+    return `Offline · Hari ini ${timeStr}`;
+  }
+
+  const yesterdayDate = new Date(Date.now() - 86_400_000);
+  if (getJakartaDateKey(yesterdayDate) === seenKey) {
+    return `Offline · Kemarin ${timeStr}`;
+  }
+
+  const datePart = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+  return `Offline · ${datePart}, ${timeStr}`;
+}
+
+function parseDataActionResult(
+  metadata: Record<string, unknown> | null | undefined,
+): ChatDataActionResult | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const raw = metadata.dataActionResult;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.title !== "string" ||
+    typeof rec.referenceCode !== "string" ||
+    typeof rec.summary !== "string" ||
+    typeof rec.targetUrl !== "string"
+  ) {
+    return null;
+  }
+  return {
+    actionType:
+      rec.actionType === "DAILY_REPORT" ||
+      rec.actionType === "CREATE_TICKET" ||
+      rec.actionType === "CREATE_NOTE"
+        ? rec.actionType
+        : "CREATE_NOTE",
+    title: rec.title,
+    referenceCode: rec.referenceCode,
+    summary: rec.summary,
+    targetUrl: rec.targetUrl,
+  };
+}
+
+function parseThinkingSteps(
+  metadata: Record<string, unknown> | null | undefined,
+): string[] {
+  if (!metadata || typeof metadata !== "object") return [];
+  const raw = metadata.thinkingSteps;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
 function formatRupiah(value: number): string {
@@ -910,6 +1034,94 @@ function ChatAttachmentCard({
   );
 }
 
+function BunglonThinkingBubble({ statusText }: { statusText: string }) {
+  return (
+    <div className="flex justify-start gap-2">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-[#0f2b4d] text-white shadow-xs">
+        <Brain className="size-3.5 animate-pulse" aria-hidden="true" />
+      </span>
+      <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-emerald-500/25 bg-card px-3 py-2.5 shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-foreground">
+            Bunglon Assistant
+          </span>
+          <span className="flex items-center gap-1" aria-hidden="true">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:0ms]" />
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:150ms]" />
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:300ms]" />
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground italic">{statusText}</p>
+      </div>
+    </div>
+  );
+}
+
+function BunglonMessageExtras({
+  thinkingSteps,
+  dataActionResult,
+}: {
+  thinkingSteps: string[];
+  dataActionResult: ChatDataActionResult | null;
+}) {
+  if (thinkingSteps.length === 0 && !dataActionResult) return null;
+
+  return (
+    <>
+      {thinkingSteps.length > 0 && (
+        <details className="group rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1.5 text-[11px]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-semibold text-muted-foreground hover:text-foreground">
+            <span className="flex items-center gap-1.5">
+              <Brain className="size-3 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+              <span>Proses berpikir Bunglon ({thinkingSteps.length} langkah)</span>
+            </span>
+            <ChevronDown
+              className="size-3 transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[11px] text-muted-foreground">
+            {thinkingSteps.map((step, index) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
+        </details>
+      )}
+
+      {dataActionResult && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-left">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <CheckCircle2
+                className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
+              <span className="truncate text-xs font-bold text-foreground">
+                {dataActionResult.title}
+              </span>
+            </div>
+            <span className="shrink-0 rounded bg-emerald-600 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+              {dataActionResult.referenceCode}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            {dataActionResult.summary}
+          </p>
+          <div className="mt-2 flex justify-end">
+            <Link
+              href={dataActionResult.targetUrl}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-700"
+            >
+              <span>Buka Menu</span>
+              <ArrowUpRight className="size-3" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function FloatingChatWidget({
   currentUserId,
   currentUserName,
@@ -931,6 +1143,7 @@ export default function FloatingChatWidget({
     ChatAttachmentItem[]
   >([]);
   const [sendingTeam, setSendingTeam] = useState(false);
+  const [teamThinking, setTeamThinking] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadKind, setUploadKind] = useState<UploadKind>("FTO");
   const [uploadProjectId, setUploadProjectId] = useState<string>("NONE");
@@ -938,11 +1151,15 @@ export default function FloatingChatWidget({
   const [hermesPickerOpen, setHermesPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Hermes state
+  // Bunglon Assistant (SKALA AI / Hermes compatible) state
   const [hermesInput, setHermesInput] = useState("");
+  const [pendingHermesPrompt, setPendingHermesPrompt] = useState<string | null>(
+    null,
+  );
   const [sendingHermes, setSendingHermes] = useState(false);
   const [showHermesSetup, setShowHermesSetup] = useState(false);
   const [showHermesDocForm, setShowHermesDocForm] = useState(false);
+  const [showDataInputForm, setShowDataInputForm] = useState(false);
   const [gatewayUrlInput, setGatewayUrlInput] = useState(DEFAULT_GATEWAY_URL);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [savedGatewayUrl, setSavedGatewayUrl] = useState(DEFAULT_GATEWAY_URL);
@@ -950,6 +1167,26 @@ export default function FloatingChatWidget({
   const [showApiKey, setShowApiKey] = useState(false);
   const [copiedCli, setCopiedCli] = useState(false);
   const [testingGateway, setTestingGateway] = useState(false);
+
+  // Thinking & natural progressive typing reveal state
+  const [thinkingTickIdx, setThinkingTickIdx] = useState(0);
+  const [typingReveal, setTypingReveal] = useState<{
+    messageId: string;
+    fullText: string;
+    shownLength: number;
+  } | null>(null);
+
+  // Quick ERP data input state
+  const [dataActionType, setDataActionType] =
+    useState<ChatDataActionType>("DAILY_REPORT");
+  const [dataProjectId, setDataProjectId] = useState<string>("NONE");
+  const [dataTitle, setDataTitle] = useState("");
+  const [dataCategory, setDataCategory] = useState("MATERIAL");
+  const [dataAmount, setDataAmount] = useState("");
+  const [dataProgress, setDataProgress] = useState("");
+  const [dataWorkersCount, setDataWorkersCount] = useState("");
+  const [dataWeather, setDataWeather] = useState("Cerah");
+  const [dataNotes, setDataNotes] = useState("");
 
   // Hermes quick document generator state
   const [docType, setDocType] = useState<HermesDocType>("KWITANSI");
@@ -961,6 +1198,10 @@ export default function FloatingChatWidget({
 
   const teamMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const hermesMessagesEndRef = useRef<HTMLDivElement | null>(null);
+  const lastTypingPingRef = useRef<{ roomId: string | null; at: number }>({
+    roomId: null,
+    at: 0,
+  });
 
   // Hydrate Hermes Gateway settings safely from localStorage on client mount
   useEffect(() => {
@@ -1077,6 +1318,74 @@ export default function FloatingChatWidget({
     },
   );
 
+  const startTypingReveal = useCallback((msg?: ChatMessageDto | null) => {
+    if (!msg || !msg.id || !msg.content) return;
+    setTypingReveal({
+      messageId: msg.id,
+      fullText: msg.content,
+      shownLength: Math.min(msg.content.length, 4),
+    });
+  }, []);
+
+  const pingPresence = useCallback(
+    async (roomId: string | null, isTyping: boolean) => {
+      try {
+        await fetch("/api/chat/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomId, isTyping }),
+        });
+      } catch {
+        // Ignore transient presence heartbeat errors
+      }
+    },
+    [],
+  );
+
+  // Keep user online presence alive via periodic heartbeat
+  useEffect(() => {
+    void pingPresence(null, false);
+    const interval = window.setInterval(() => {
+      void pingPresence(null, false);
+    }, 45_000);
+    return () => window.clearInterval(interval);
+  }, [pingPresence]);
+
+  // Cycle Bunglon thinking narration while processing
+  const isBunglonThinking = sendingHermes || teamThinking;
+  useEffect(() => {
+    if (!isBunglonThinking) return;
+    const timer = window.setInterval(() => {
+      setThinkingTickIdx((prev) => prev + 1);
+    }, 950);
+    return () => window.clearInterval(timer);
+  }, [isBunglonThinking]);
+
+  // Progressive natural typing animation for Bunglon responses
+  const activeRevealId = typingReveal?.messageId ?? null;
+  const activeRevealDone = typingReveal
+    ? typingReveal.shownLength >= typingReveal.fullText.length
+    : true;
+  useEffect(() => {
+    if (!activeRevealId || activeRevealDone) return;
+    const timer = window.setInterval(() => {
+      setTypingReveal((prev) => {
+        if (!prev || prev.messageId !== activeRevealId) return null;
+        if (prev.shownLength >= prev.fullText.length) return null;
+        const step =
+          prev.fullText.length > 520
+            ? 8
+            : prev.fullText.length > 220
+              ? 5
+              : 3;
+        const nextLen = Math.min(prev.fullText.length, prev.shownLength + step);
+        if (nextLen >= prev.fullText.length) return null;
+        return { ...prev, shownLength: nextLen };
+      });
+    }, 20);
+    return () => window.clearInterval(timer);
+  }, [activeRevealId, activeRevealDone]);
+
   // Auto-scroll team messages
   const teamMessageCount = teamMessagesData?.messages.length ?? 0;
   const lastTeamMessageId =
@@ -1084,16 +1393,31 @@ export default function FloatingChatWidget({
   useEffect(() => {
     if (!isOpen || activeTab !== "team" || !selectedTarget) return;
     teamMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [isOpen, activeTab, selectedTarget, teamMessageCount, lastTeamMessageId]);
+  }, [
+    isOpen,
+    activeTab,
+    selectedTarget,
+    teamMessageCount,
+    lastTeamMessageId,
+    teamThinking,
+    typingReveal?.shownLength,
+  ]);
 
-  // Auto-scroll Hermes messages
+  // Auto-scroll Bunglon / Hermes messages
   const hermesMessageCount = hermesMessagesData?.messages.length ?? 0;
   const lastHermesMessageId =
     hermesMessagesData?.messages[hermesMessageCount - 1]?.id ?? null;
   useEffect(() => {
     if (!isOpen || activeTab !== "hermes") return;
     hermesMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [isOpen, activeTab, hermesMessageCount, lastHermesMessageId]);
+  }, [
+    isOpen,
+    activeTab,
+    hermesMessageCount,
+    lastHermesMessageId,
+    sendingHermes,
+    typingReveal?.shownLength,
+  ]);
 
   const directRoomByUserId = useMemo(() => {
     const map = new Map<string, ChatRoomDto>();
@@ -1158,6 +1482,38 @@ export default function FloatingChatWidget({
     }
     return directRoomByUserId.get(selectedTarget.userId) ?? null;
   }, [teamMessagesData, bootstrap, selectedTarget, directRoomByUserId]);
+
+  const activeTeamRoomId =
+    activeTeamRoom?.id ??
+    (selectedTarget?.kind === "room" ? selectedTarget.roomId : null);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== "team" || !activeTeamRoomId) return;
+    const isTyping = teamInput.trim().length > 0;
+    const now = Date.now();
+    if (!isTyping) {
+      if (lastTypingPingRef.current.roomId) {
+        lastTypingPingRef.current = { roomId: null, at: 0 };
+        void pingPresence(null, false);
+      }
+      return;
+    }
+
+    if (
+      lastTypingPingRef.current.roomId !== activeTeamRoomId ||
+      now - lastTypingPingRef.current.at > 4_000
+    ) {
+      lastTypingPingRef.current = { roomId: activeTeamRoomId, at: now };
+      void pingPresence(activeTeamRoomId, true);
+    }
+
+    const idleTimer = window.setTimeout(() => {
+      lastTypingPingRef.current = { roomId: null, at: 0 };
+      void pingPresence(null, false);
+    }, 4_000);
+
+    return () => window.clearTimeout(idleTimer);
+  }, [isOpen, activeTab, activeTeamRoomId, teamInput, pingPresence]);
 
   const activeDirectPartner = useMemo(() => {
     if (!bootstrap || !selectedTarget) return null;
@@ -1266,8 +1622,16 @@ export default function FloatingChatWidget({
     const finalContent =
       trimmed ||
       `Melampirkan ${pendingAttachments.map((att) => att.title).join(", ")}`;
+    const mentionsBunglon =
+      /@(?:bunglon|skala|assistant|ai)\b/i.test(finalContent);
 
     setSendingTeam(true);
+    if (mentionsBunglon) {
+      setThinkingTickIdx(0);
+      setTeamThinking(true);
+    }
+    lastTypingPingRef.current = { roomId: null, at: 0 };
+
     try {
       const payload =
         selectedTarget.kind === "room"
@@ -1275,11 +1639,25 @@ export default function FloatingChatWidget({
               roomId: selectedTarget.roomId,
               content: finalContent,
               attachments: pendingAttachments,
+              invokeAssistant: mentionsBunglon,
+              projectId:
+                uploadProjectId && uploadProjectId !== "NONE"
+                  ? uploadProjectId
+                  : undefined,
+              customGatewayUrl: savedGatewayUrl || undefined,
+              customApiKey: savedApiKey || undefined,
             }
           : {
               targetUserId: selectedTarget.userId,
               content: finalContent,
               attachments: pendingAttachments,
+              invokeAssistant: mentionsBunglon,
+              projectId:
+                uploadProjectId && uploadProjectId !== "NONE"
+                  ? uploadProjectId
+                  : undefined,
+              customGatewayUrl: savedGatewayUrl || undefined,
+              customApiKey: savedApiKey || undefined,
             };
 
       const result = await fetchJson<PostMessageResponse>("/api/chat/messages", {
@@ -1294,11 +1672,15 @@ export default function FloatingChatWidget({
         setSelectedTarget({ kind: "room", roomId: result.room.id });
       }
       await Promise.all([mutateTeamMessages(), mutateBootstrap()]);
+      if (result.assistantMessage) {
+        startTypingReveal(result.assistantMessage);
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Gagal mengirim pesan.",
       );
     } finally {
+      setTeamThinking(false);
       setSendingTeam(false);
     }
   }, [
@@ -1306,8 +1688,12 @@ export default function FloatingChatWidget({
     sendingTeam,
     teamInput,
     pendingAttachments,
+    uploadProjectId,
+    savedGatewayUrl,
+    savedApiKey,
     mutateTeamMessages,
     mutateBootstrap,
+    startTypingReveal,
   ]);
 
   const handleTeamTextareaKeyDown = (
@@ -1394,6 +1780,11 @@ export default function FloatingChatWidget({
     const content = (customMessage ?? hermesInput).trim();
     if (!content) return;
 
+    if (!customMessage) {
+      setHermesInput("");
+    }
+    setPendingHermesPrompt(content);
+    setThinkingTickIdx(0);
     setSendingHermes(true);
     try {
       const result = await fetchJson<HermesGenerateResponse>(
@@ -1413,22 +1804,129 @@ export default function FloatingChatWidget({
         },
       );
 
-      if (!customMessage) {
-        setHermesInput("");
-      }
       await Promise.all([mutateHermesMessages(), mutateBootstrap()]);
+      startTypingReveal(result.assistantMessage);
       if (result.generatedDocument) {
         toast.success(
           `Dokumen ${result.generatedDocument.documentNumber} berhasil dibuat`,
         );
+      } else if (result.dataActionResult) {
+        toast.success(`${result.dataActionResult.title} (${result.dataActionResult.referenceCode})`);
       }
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Hermes gagal memproses permintaan.",
+          : "Bunglon Assistant gagal memproses permintaan.",
       );
     } finally {
+      setPendingHermesPrompt(null);
+      setSendingHermes(false);
+    }
+  };
+
+  const handleSubmitDataInput = async () => {
+    if (sendingHermes) return;
+
+    const projectId =
+      dataProjectId && dataProjectId !== "NONE" ? dataProjectId : undefined;
+    const trimmedTitle = dataTitle.trim();
+    const trimmedNotes = dataNotes.trim();
+    const numericAmount = dataAmount
+      ? Number(dataAmount.replace(/[^0-9.]/g, ""))
+      : undefined;
+    const validAmount =
+      numericAmount !== undefined &&
+      Number.isFinite(numericAmount) &&
+      numericAmount > 0
+        ? numericAmount
+        : undefined;
+    const numericProgress =
+      dataProgress.trim() !== "" ? Number(dataProgress) : undefined;
+    const validProgress =
+      numericProgress !== undefined && Number.isFinite(numericProgress)
+        ? Math.max(0, Math.min(100, numericProgress))
+        : undefined;
+    const numericWorkers =
+      dataWorkersCount.trim() !== "" ? Number(dataWorkersCount) : undefined;
+    const validWorkers =
+      numericWorkers !== undefined && Number.isFinite(numericWorkers)
+        ? Math.max(0, Math.round(numericWorkers))
+        : undefined;
+
+    if (dataActionType === "DAILY_REPORT" && !projectId) {
+      toast.error("Pilih proyek terlebih dahulu untuk Laporan Harian.");
+      return;
+    }
+    if (dataActionType === "CREATE_TICKET" && trimmedTitle.length < 3) {
+      toast.error("Isi judul/keperluan tiket minimal 3 karakter.");
+      return;
+    }
+    if (dataActionType === "CREATE_NOTE" && (trimmedNotes || trimmedTitle).length < 2) {
+      toast.error("Isi catatan kerja terlebih dahulu.");
+      return;
+    }
+
+    const actionMeta =
+      DATA_ACTION_OPTIONS.find((item) => item.value === dataActionType)?.label ??
+      dataActionType;
+    const promptSummary =
+      dataActionType === "DAILY_REPORT"
+        ? `Input laporan harian (${validProgress ?? "-"}%, cuaca ${dataWeather}${trimmedNotes ? `: ${trimmedNotes}` : ""})`
+        : dataActionType === "CREATE_TICKET"
+          ? `Ajukan tiket ${dataCategory}: ${trimmedTitle}${validAmount ? ` (${formatRupiah(validAmount)})` : ""}`
+          : `Simpan catatan: ${trimmedNotes || trimmedTitle}`;
+
+    setPendingHermesPrompt(promptSummary);
+    setThinkingTickIdx(0);
+    setSendingHermes(true);
+    try {
+      const result = await fetchJson<HermesGenerateResponse>(
+        "/api/chat/hermes",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: promptSummary,
+            projectId,
+            dataInput: {
+              actionType: dataActionType,
+              projectId,
+              title: trimmedTitle || undefined,
+              category: dataActionType === "CREATE_TICKET" ? dataCategory : undefined,
+              amount: validAmount,
+              progress: validProgress,
+              workersCount: validWorkers,
+              weather: dataActionType === "DAILY_REPORT" ? dataWeather : undefined,
+              notes: trimmedNotes || undefined,
+            },
+            customGatewayUrl: savedGatewayUrl || undefined,
+            customApiKey: savedApiKey || undefined,
+          }),
+        },
+      );
+
+      setDataTitle("");
+      setDataAmount("");
+      setDataProgress("");
+      setDataWorkersCount("");
+      setDataNotes("");
+      setShowDataInputForm(false);
+      await Promise.all([mutateHermesMessages(), mutateBootstrap()]);
+      startTypingReveal(result.assistantMessage);
+      toast.success(
+        result.dataActionResult
+          ? `${result.dataActionResult.title} (${result.dataActionResult.referenceCode})`
+          : `${actionMeta} diproses oleh Bunglon Assistant`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Gagal menginput data ERP lewat Bunglon Assistant.",
+      );
+    } finally {
+      setPendingHermesPrompt(null);
       setSendingHermes(false);
     }
   };
@@ -1461,7 +1959,10 @@ export default function FloatingChatWidget({
       `Buatkan dokumen ${docLabel}${recipientText}${amountText}.`,
       trimmedDesc ? `Rincian: ${trimmedDesc}` : "",
     ].filter(Boolean);
+    const composedPrompt = messageParts.join(" ");
 
+    setPendingHermesPrompt(composedPrompt);
+    setThinkingTickIdx(0);
     setSendingHermes(true);
     try {
       const result = await fetchJson<HermesGenerateResponse>(
@@ -1470,7 +1971,7 @@ export default function FloatingChatWidget({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: messageParts.join(" "),
+            message: composedPrompt,
             projectId:
               docProjectId && docProjectId !== "NONE" ? docProjectId : undefined,
             ticketId:
@@ -1493,16 +1994,20 @@ export default function FloatingChatWidget({
       setDocDescription("");
       setShowHermesDocForm(false);
       await Promise.all([mutateHermesMessages(), mutateBootstrap()]);
+      startTypingReveal(result.assistantMessage);
       toast.success(
         result.generatedDocument
           ? `Dokumen ${result.generatedDocument.documentNumber} berhasil dibuat`
-          : `${docLabel} berhasil dibuat oleh Hermes`,
+          : `${docLabel} berhasil dibuat oleh Bunglon AI`,
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Gagal membuat dokumen Hermes.",
+        error instanceof Error
+          ? error.message
+          : "Gagal membuat dokumen Bunglon Assistant.",
       );
     } finally {
+      setPendingHermesPrompt(null);
       setSendingHermes(false);
     }
   };
@@ -1646,6 +2151,11 @@ export default function FloatingChatWidget({
                     (selectedTarget?.kind === "room" &&
                       directRoom?.id === selectedTarget.roomId);
 
+                  const isTypingAnywhere = Boolean(user.typingInRoomId);
+                  const presenceText = isTypingAnywhere
+                    ? "✍️ Sedang mengetik..."
+                    : formatLastSeen(user.lastSeenAt, user.isOnline);
+
                   return (
                     <button
                       key={user.id}
@@ -1658,24 +2168,34 @@ export default function FloatingChatWidget({
                           : "hover:bg-accent/70",
                       )}
                     >
-                      <Avatar className="size-8 shrink-0 border border-border/60">
-                        {user.profilePhotoUrl && (
-                          <AvatarImage
-                            src={user.profilePhotoUrl}
-                            alt={user.name}
-                          />
-                        )}
-                        <AvatarFallback
-                          className={cn(
-                            "text-[11px] font-bold",
-                            isActive
-                              ? "bg-white/15 text-amber-200"
-                              : "bg-primary/10 text-primary",
+                      <div className="relative shrink-0">
+                        <Avatar className="size-8 border border-border/60">
+                          {user.profilePhotoUrl && (
+                            <AvatarImage
+                              src={user.profilePhotoUrl}
+                              alt={user.name}
+                            />
                           )}
-                        >
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                          <AvatarFallback
+                            className={cn(
+                              "text-[11px] font-bold",
+                              isActive
+                                ? "bg-white/15 text-amber-200"
+                                : "bg-primary/10 text-primary",
+                            )}
+                          >
+                            {getInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span
+                          aria-label={user.isOnline ? "Online" : "Offline"}
+                          className={cn(
+                            "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2",
+                            isActive ? "border-[#0f2b4d]" : "border-card",
+                            user.isOnline ? "bg-emerald-500" : "bg-slate-400",
+                          )}
+                        />
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1.5">
                           <span className="truncate text-xs font-bold">
@@ -1697,14 +2217,32 @@ export default function FloatingChatWidget({
                         <div className="mt-0.5 flex items-center justify-between gap-1.5">
                           <span
                             className={cn(
-                              "truncate text-[11px]",
-                              isActive
-                                ? "text-white/80"
-                                : "text-muted-foreground",
+                              "inline-flex min-w-0 items-center gap-1 truncate text-[11px]",
+                              isTypingAnywhere
+                                ? isActive
+                                  ? "font-semibold text-amber-200"
+                                  : "font-semibold text-emerald-600 dark:text-emerald-400"
+                                : user.isOnline
+                                  ? isActive
+                                    ? "font-medium text-emerald-200"
+                                    : "font-medium text-emerald-600 dark:text-emerald-400"
+                                  : isActive
+                                    ? "text-white/75"
+                                    : "text-muted-foreground",
                             )}
                           >
-                            {directRoom?.lastMessageText ||
-                              getRoleLabel(user.role)}
+                            {!isTypingAnywhere && (
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  "size-1.5 shrink-0 rounded-full",
+                                  user.isOnline
+                                    ? "bg-emerald-500"
+                                    : "bg-slate-400",
+                                )}
+                              />
+                            )}
+                            <span className="truncate">{presenceText}</span>
                           </span>
                           <div className="flex shrink-0 items-center gap-1">
                             <span
@@ -1726,6 +2264,18 @@ export default function FloatingChatWidget({
                             )}
                           </div>
                         </div>
+                        {directRoom?.lastMessageText && (
+                          <p
+                            className={cn(
+                              "mt-0.5 truncate text-[10px]",
+                              isActive
+                                ? "text-white/70"
+                                : "text-muted-foreground/80",
+                            )}
+                          >
+                            {directRoom.lastMessageText}
+                          </p>
+                        )}
                       </div>
                     </button>
                   );
@@ -1754,8 +2304,8 @@ export default function FloatingChatWidget({
             Pilih Kanal atau Rekan Tim
           </p>
           <p className="mt-1 max-w-[260px] text-xs leading-relaxed">
-            Kirim pesan langsung, foto lapangan, bon/kwitansi, atau lampirkan
-            dokumen resmi dari Hermes AI.
+            Kirim pesan langsung, foto lapangan, panggil @bunglon di grup, atau
+            lampirkan dokumen resmi dari Bunglon AI.
           </p>
         </div>
       );
@@ -1763,10 +2313,21 @@ export default function FloatingChatWidget({
 
     const conversationTitle =
       activeDirectPartner?.name ?? activeTeamRoom?.name ?? "Percakapan Tim";
+    const partnerPresenceLabel = activeDirectPartner
+      ? activeDirectPartner.typingInRoomId === activeTeamRoom?.id
+        ? "✍️ Sedang mengetik..."
+        : formatLastSeen(
+            activeDirectPartner.lastSeenAt,
+            activeDirectPartner.isOnline,
+          )
+      : null;
     const conversationSubtitle = activeDirectPartner
-      ? getRoleLabel(activeDirectPartner.role)
-      : activeTeamRoom?.description ?? "Kanal koordinasi internal";
+      ? `${getRoleLabel(activeDirectPartner.role)} · ${partnerPresenceLabel}`
+      : activeTeamRoom?.description ?? "Kanal koordinasi internal (ketik @bunglon untuk panggil AI)";
     const isChannel = activeTeamRoom?.type === "CHANNEL";
+    const activeTypingUsers = (teamMessagesData?.typingUsers ?? []).filter(
+      (item) => item.userId !== effectiveUserId,
+    );
 
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1792,17 +2353,30 @@ export default function FloatingChatWidget({
                 <Hash className="size-4" aria-hidden="true" />
               </span>
             ) : (
-              <Avatar className="size-8 shrink-0 border border-border">
-                {activeDirectPartner?.profilePhotoUrl && (
-                  <AvatarImage
-                    src={activeDirectPartner.profilePhotoUrl}
-                    alt={conversationTitle}
+              <div className="relative shrink-0">
+                <Avatar className="size-8 border border-border">
+                  {activeDirectPartner?.profilePhotoUrl && (
+                    <AvatarImage
+                      src={activeDirectPartner.profilePhotoUrl}
+                      alt={conversationTitle}
+                    />
+                  )}
+                  <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">
+                    {getInitials(conversationTitle)}
+                  </AvatarFallback>
+                </Avatar>
+                {activeDirectPartner && (
+                  <span
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card",
+                      activeDirectPartner.isOnline
+                        ? "bg-emerald-500"
+                        : "bg-slate-400",
+                    )}
+                    aria-hidden="true"
                   />
                 )}
-                <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">
-                  {getInitials(conversationTitle)}
-                </AvatarFallback>
-              </Avatar>
+              </div>
             )}
 
             <div className="min-w-0">
@@ -1840,11 +2414,27 @@ export default function FloatingChatWidget({
             </div>
           ) : (teamMessagesData?.messages.length ?? 0) === 0 ? (
             <div className="py-10 text-center text-xs text-muted-foreground">
-              Belum ada pesan. Mulai koordinasi tim sekarang.
+              Belum ada pesan. Mulai koordinasi tim atau ketik @bunglon untuk
+              bantuan AI.
             </div>
           ) : (
             teamMessagesData?.messages.map((message) => {
               const isOwn = message.senderId === effectiveUserId;
+              const isAssistantMessage =
+                message.senderId === "hermes-assistant" ||
+                message.senderRole === "BUNGLON_AI" ||
+                message.senderRole === "AI_ASSISTANT";
+              const isTypingThisMessage = typingReveal?.messageId === message.id;
+              const displayedContent = isTypingThisMessage
+                ? typingReveal.fullText.slice(0, typingReveal.shownLength)
+                : message.content;
+              const thinkingSteps = isAssistantMessage
+                ? parseThinkingSteps(message.metadata)
+                : [];
+              const dataActionResult = isAssistantMessage
+                ? parseDataActionResult(message.metadata)
+                : null;
+
               return (
                 <div
                   key={message.id}
@@ -1853,58 +2443,111 @@ export default function FloatingChatWidget({
                     isOwn ? "justify-end" : "justify-start",
                   )}
                 >
-                  {!isOwn && (
-                    <Avatar className="mt-0.5 size-7 shrink-0 border border-border">
-                      {message.senderAvatarUrl && (
-                        <AvatarImage
-                          src={message.senderAvatarUrl}
-                          alt={message.senderName}
-                        />
-                      )}
-                      <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
-                        {getInitials(message.senderName)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+                  {!isOwn &&
+                    (isAssistantMessage ? (
+                      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-[#0f2b4d] text-white shadow-xs">
+                        <Bot className="size-4" aria-hidden="true" />
+                      </span>
+                    ) : (
+                      <Avatar className="mt-0.5 size-7 shrink-0 border border-border">
+                        {message.senderAvatarUrl && (
+                          <AvatarImage
+                            src={message.senderAvatarUrl}
+                            alt={message.senderName}
+                          />
+                        )}
+                        <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+                          {getInitials(message.senderName)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
 
                   <div
                     className={cn(
                       "max-w-[85%] space-y-1.5 rounded-2xl px-3 py-2 shadow-xs",
                       isOwn
                         ? "rounded-br-sm bg-[#0f2b4d] text-white dark:bg-primary dark:text-primary-foreground"
-                        : "rounded-bl-sm border border-border bg-card text-card-foreground",
+                        : isAssistantMessage
+                          ? "rounded-bl-sm border border-emerald-500/30 bg-card text-card-foreground"
+                          : "rounded-bl-sm border border-border bg-card text-card-foreground",
                     )}
                   >
                     {!isOwn && (
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[11px] font-bold text-foreground">
-                          {message.senderName}
+                          {isAssistantMessage
+                            ? "Bunglon Assistant (SKALA AI)"
+                            : message.senderName}
                         </span>
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground">
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[9px] font-semibold",
+                            isAssistantMessage
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
                           {getRoleLabel(message.senderRole)}
                         </span>
                       </div>
                     )}
 
+                    {!isTypingThisMessage && thinkingSteps.length > 0 && (
+                      <BunglonMessageExtras
+                        thinkingSteps={thinkingSteps}
+                        dataActionResult={null}
+                      />
+                    )}
+
                     <p className="whitespace-pre-wrap break-words text-xs leading-relaxed">
-                      {message.content}
+                      {displayedContent}
+                      {isTypingThisMessage && (
+                        <span
+                          aria-hidden="true"
+                          className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-500 align-middle"
+                        />
+                      )}
                     </p>
 
-                    {message.attachments.length > 0 && (
-                      <div className="space-y-1.5 pt-0.5">
-                        {message.attachments.map((att) => (
-                          <ChatAttachmentCard
-                            key={att.id}
-                            attachment={att}
-                            isOwnMessage={isOwn}
-                            allowForward={false}
-                            channels={bootstrap?.channels ?? []}
-                            users={teamUsers}
-                            directRoomByUserId={directRoomByUserId}
-                            onForwardSuccess={() => void mutateBootstrap()}
-                          />
-                        ))}
+                    {isTypingThisMessage ? (
+                      <div className="flex items-center justify-between gap-2 pt-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                        <span className="font-medium italic">
+                          ✍️ Bunglon sedang mengetik...
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setTypingReveal(null)}
+                          className="underline hover:text-foreground"
+                        >
+                          Tampilkan penuh
+                        </button>
                       </div>
+                    ) : (
+                      <>
+                        {dataActionResult && (
+                          <BunglonMessageExtras
+                            thinkingSteps={[]}
+                            dataActionResult={dataActionResult}
+                          />
+                        )}
+
+                        {message.attachments.length > 0 && (
+                          <div className="space-y-1.5 pt-0.5">
+                            {message.attachments.map((att) => (
+                              <ChatAttachmentCard
+                                key={att.id}
+                                attachment={att}
+                                isOwnMessage={isOwn}
+                                allowForward={isAssistantMessage}
+                                channels={bootstrap?.channels ?? []}
+                                users={teamUsers}
+                                directRoomByUserId={directRoomByUserId}
+                                onForwardSuccess={() => void mutateBootstrap()}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
 
                     <p
@@ -1920,8 +2563,31 @@ export default function FloatingChatWidget({
               );
             })
           )}
+          {teamThinking && (
+            <BunglonThinkingBubble
+              statusText={
+                BUNGLON_THINKING_MESSAGES[
+                  thinkingTickIdx % BUNGLON_THINKING_MESSAGES.length
+                ]
+              }
+            />
+          )}
           <div ref={teamMessagesEndRef} />
         </div>
+
+        {/* Live teammate typing indicator */}
+        {activeTypingUsers.length > 0 && (
+          <div className="flex items-center gap-1.5 border-t border-border/60 bg-emerald-500/5 px-3 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-ping" />
+            <span>
+              ✍️{" "}
+              {activeTypingUsers
+                .map((u) => u.userName.split(" ")[0] || u.userName)
+                .join(", ")}{" "}
+              sedang mengetik...
+            </span>
+          </div>
+        )}
 
         {/* Pending staged attachments */}
         {pendingAttachments.length > 0 && (
@@ -2069,7 +2735,7 @@ export default function FloatingChatWidget({
               </PopoverContent>
             </Popover>
 
-            {/* Quick Hermes document picker */}
+            {/* Quick Bunglon document picker */}
             <Popover open={hermesPickerOpen} onOpenChange={setHermesPickerOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -2079,7 +2745,7 @@ export default function FloatingChatWidget({
                   className="h-7 gap-1 px-2 text-[11px]"
                 >
                   <FileCheck2 className="size-3.5" aria-hidden="true" />
-                  <span>Lampirkan Dokumen Hermes</span>
+                  <span>Lampirkan Dokumen Bunglon</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -2089,7 +2755,7 @@ export default function FloatingChatWidget({
               >
                 <div className="border-b border-border px-3 py-2">
                   <p className="text-xs font-bold text-foreground">
-                    Dokumen Hermes Terbaru
+                    Dokumen Bunglon Terbaru
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     Pilih dokumen resmi untuk langsung dilampirkan ke chat.
@@ -2098,7 +2764,7 @@ export default function FloatingChatWidget({
                 <div className="max-h-64 overflow-y-auto p-1.5">
                   {(bootstrap?.recentDocuments.length ?? 0) === 0 ? (
                     <div className="px-3 py-5 text-center text-xs text-muted-foreground">
-                      <p>Belum ada dokumen Hermes.</p>
+                      <p>Belum ada dokumen Bunglon.</p>
                       <Button
                         type="button"
                         size="xs"
@@ -2110,7 +2776,7 @@ export default function FloatingChatWidget({
                         }}
                         className="mt-2"
                       >
-                        Buat di Tab Hermes AI
+                        Buat di Tab Bunglon AI
                       </Button>
                     </div>
                   ) : (
@@ -2149,6 +2815,25 @@ export default function FloatingChatWidget({
                 </div>
               </PopoverContent>
             </Popover>
+
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() =>
+                setTeamInput((prev) =>
+                  /@bunglon\b/i.test(prev)
+                    ? prev
+                    : prev.trim()
+                      ? `@bunglon ${prev}`
+                      : "@bunglon ",
+                )
+              }
+              className="h-7 gap-1 border-emerald-500/35 bg-emerald-500/10 px-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+            >
+              <Bot className="size-3.5" aria-hidden="true" />
+              <span>@Bunglon</span>
+            </Button>
           </div>
 
           <div className="flex items-end gap-2">
@@ -2156,7 +2841,7 @@ export default function FloatingChatWidget({
               value={teamInput}
               onChange={(event) => setTeamInput(event.target.value)}
               onKeyDown={handleTeamTextareaKeyDown}
-              placeholder="Tulis pesan... (Enter kirim, Shift+Enter baris baru)"
+              placeholder="Tulis pesan atau ketik @bunglon untuk panggil asisten..."
               rows={2}
               className="mt-0 min-h-10 max-h-28 resize-none text-xs"
             />
@@ -2203,24 +2888,45 @@ export default function FloatingChatWidget({
             <div className="min-w-0">
               <p className="truncate text-[11px] font-bold text-foreground">
                 {isGeminiGateway
-                  ? `Gemini API Aktif${hermesStatus?.model ? ` · ${hermesStatus.model}` : ""}`
+                  ? `Bunglon AI · Gemini API${hermesStatus?.model ? ` (${hermesStatus.model})` : ""}`
                   : gatewayOnline
-                    ? `Gateway CLI Aktif${hermesStatus?.model ? ` · ${hermesStatus.model}` : ""}`
-                    : "Built-in Hermes ERP Engine Aktif"}
+                    ? `Bunglon AI · Gateway CLI${hermesStatus?.model ? ` (${hermesStatus.model})` : ""}`
+                    : "Bunglon ERP Engine Aktif"}
               </p>
               <p className="truncate text-[10px] text-muted-foreground">
                 {hermesStatus?.detail ||
-                  "Pembuat dokumen resmi & asisten operasional MongoDB"}
+                  "Asisten input data ERP, analisis progres, & pembuat laporan PDF"}
               </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            <Button
+              type="button"
+              size="xs"
+              variant={showDataInputForm ? "default" : "outline"}
+              onClick={() => {
+                setShowDataInputForm((prev) => !prev);
+                setShowHermesDocForm(false);
+              }}
+              className={cn(
+                "h-7 gap-1 px-2 text-[11px]",
+                !showDataInputForm &&
+                  "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300",
+              )}
+            >
+              <Zap className="size-3.5" aria-hidden="true" />
+              <span>Input Data</span>
+            </Button>
+
             <Button
               type="button"
               size="xs"
               variant={showHermesDocForm ? "default" : "lightprimary"}
-              onClick={() => setShowHermesDocForm((prev) => !prev)}
+              onClick={() => {
+                setShowHermesDocForm((prev) => !prev);
+                setShowDataInputForm(false);
+              }}
               className="h-7 gap-1 px-2 text-[11px]"
             >
               <FilePlus2 className="size-3.5" aria-hidden="true" />
@@ -2240,7 +2946,7 @@ export default function FloatingChatWidget({
               className="h-7 gap-1 px-2 text-[11px]"
             >
               <Settings2 className="size-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">Setup Hermes Agent CLI</span>
+              <span className="hidden sm:inline">Setup CLI</span>
               <span className="sm:hidden">CLI</span>
             </Button>
           </div>
@@ -2562,30 +3268,278 @@ export default function FloatingChatWidget({
           </div>
         )}
 
-        {/* Hermes Conversation Feed */}
+        {/* Collapsible Input Data ERP Cepat Card */}
+        {showDataInputForm && (
+          <div className="max-h-80 overflow-y-auto border-b border-border bg-emerald-500/5 p-3 text-xs dark:bg-emerald-500/10 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-bold text-foreground">
+                Input Data ERP Cepat via Bunglon Assistant
+              </p>
+              <button
+                type="button"
+                aria-label="Tutup form input data"
+                onClick={() => setShowDataInputForm(false)}
+                className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="bunglon-data-action-type"
+                  className="mb-1 block text-[11px] font-semibold text-foreground"
+                >
+                  Jenis Input Data
+                </label>
+                <Select
+                  value={dataActionType}
+                  onValueChange={(value) =>
+                    setDataActionType(value as ChatDataActionType)
+                  }
+                >
+                  <SelectTrigger
+                    id="bunglon-data-action-type"
+                    size="sm"
+                    className="w-full bg-background text-xs"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border border-border">
+                    {DATA_ACTION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(bootstrap?.projects.length ?? 0) > 0 && (
+                <div>
+                  <label
+                    htmlFor="bunglon-data-project"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    {dataActionType === "DAILY_REPORT"
+                      ? "Pilih Proyek (Wajib)"
+                      : "Tautkan Proyek (Opsional)"}
+                  </label>
+                  <Select
+                    value={dataProjectId}
+                    onValueChange={setDataProjectId}
+                  >
+                    <SelectTrigger
+                      id="bunglon-data-project"
+                      size="sm"
+                      className="w-full bg-background text-xs"
+                    >
+                      <SelectValue placeholder="Pilih proyek" />
+                    </SelectTrigger>
+                    <SelectContent className="border border-border">
+                      <SelectItem value="NONE">Tanpa proyek spesifik</SelectItem>
+                      {bootstrap?.projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.code} — {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            {dataActionType === "DAILY_REPORT" && (
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label
+                    htmlFor="bunglon-data-progress"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    Progres (%)
+                  </label>
+                  <Input
+                    id="bunglon-data-progress"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                    value={dataProgress}
+                    onChange={(event) => setDataProgress(event.target.value)}
+                    placeholder="cth: 65"
+                    className="h-8 bg-background text-xs"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="bunglon-data-workers"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    Jml Pekerja
+                  </label>
+                  <Input
+                    id="bunglon-data-workers"
+                    type="number"
+                    min={0}
+                    value={dataWorkersCount}
+                    onChange={(event) =>
+                      setDataWorkersCount(event.target.value)
+                    }
+                    placeholder="cth: 12"
+                    className="h-8 bg-background text-xs"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="bunglon-data-weather"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    Cuaca
+                  </label>
+                  <Input
+                    id="bunglon-data-weather"
+                    value={dataWeather}
+                    onChange={(event) => setDataWeather(event.target.value)}
+                    placeholder="Cerah"
+                    className="h-8 bg-background text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {dataActionType === "CREATE_TICKET" && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="bunglon-data-title"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    Judul / Keperluan Tiket
+                  </label>
+                  <Input
+                    id="bunglon-data-title"
+                    value={dataTitle}
+                    onChange={(event) => setDataTitle(event.target.value)}
+                    placeholder="cth: Pembelian 50 sak semen"
+                    className="h-8 bg-background text-xs"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="bunglon-data-category"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    Kategori
+                  </label>
+                  <Select value={dataCategory} onValueChange={setDataCategory}>
+                    <SelectTrigger
+                      id="bunglon-data-category"
+                      size="sm"
+                      className="w-full bg-background text-xs"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border border-border">
+                      <SelectItem value="MATERIAL">Material</SelectItem>
+                      <SelectItem value="KASBON">Kasbon</SelectItem>
+                      <SelectItem value="REIMBURSE">Reimburse</SelectItem>
+                      <SelectItem value="BIAYA_OPERASIONAL">
+                        Biaya Operasional
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-3">
+                  <label
+                    htmlFor="bunglon-data-amount"
+                    className="mb-1 block text-[11px] font-semibold text-foreground"
+                  >
+                    Estimasi Nominal (Rp)
+                  </label>
+                  <Input
+                    id="bunglon-data-amount"
+                    inputMode="numeric"
+                    value={dataAmount}
+                    onChange={(event) => setDataAmount(event.target.value)}
+                    placeholder="cth: 3500000"
+                    className="h-8 bg-background text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label
+                htmlFor="bunglon-data-notes"
+                className="mb-1 block text-[11px] font-semibold text-foreground"
+              >
+                {dataActionType === "CREATE_NOTE"
+                  ? "Isi Catatan Kerja"
+                  : "Ringkasan Pekerjaan / Catatan"}
+              </label>
+              <Textarea
+                id="bunglon-data-notes"
+                value={dataNotes}
+                onChange={(event) => setDataNotes(event.target.value)}
+                rows={2}
+                placeholder={
+                  dataActionType === "DAILY_REPORT"
+                    ? "Tuliskan pekerjaan hari ini atau kendala lapangan..."
+                    : dataActionType === "CREATE_TICKET"
+                      ? "Rincian kebutuhan item, lokasi pengiriman, atau urgensi..."
+                      : "Tuliskan catatan atau pengingat penting Anda..."
+                }
+                className="mt-0 min-h-14 bg-background text-xs"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={sendingHermes}
+                onClick={() => void handleSubmitDataInput()}
+                className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                {sendingHermes ? (
+                  <Loader2
+                    className="size-3.5 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Zap className="size-3.5" aria-hidden="true" />
+                )}
+                <span>Simpan Data ERP</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Bunglon Conversation Feed */}
         <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 p-3 space-y-3 dark:bg-slate-950/35">
           {(bootstrapLoading && !bootstrap) ||
           (hermesMessagesLoading && !hermesMessagesData) ? (
             <div className="flex items-center justify-center py-12 text-xs text-muted-foreground gap-2">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              <span>Menyiapkan Hermes Assistant...</span>
+              <span>Menyiapkan Bunglon Assistant...</span>
             </div>
           ) : hermesMessagesError ? (
             <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-center text-xs text-destructive">
-              Gagal memuat riwayat Hermes Assistant.
+              Gagal memuat riwayat Bunglon Assistant.
             </div>
           ) : messages.length === 0 ? (
             <div className="rounded-2xl border border-border bg-card p-4 text-center shadow-xs">
-              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-[#0f2b4d] text-amber-400">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-[#0f2b4d] text-white">
                 <Bot className="size-5" aria-hidden="true" />
               </div>
               <p className="mt-2.5 text-sm font-bold text-foreground">
-                Hermes AI · Asisten Dokumen &amp; ERP
+                Bunglon Assistant (SKALA AI)
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Tanyakan ringkasan proyek &amp; tiket MongoDB atau minta Hermes
-                membuat Kwitansi, Lampiran Bon, SPK, BAST, PO, dan Surat Jalan
-                siap cetak PDF.
+                Rekan asisten AI yang siap ngobrol natural, bantu input laporan
+                harian/tiket/catatan, analisis data proyek, serta cetak PDF
+                Kwitansi, SPK, BAST, PO, &amp; Surat Jalan.
               </p>
             </div>
           ) : (
@@ -2600,6 +3554,16 @@ export default function FloatingChatWidget({
                 message.metadata.gatewayUrl.includes(
                   "generativelanguage.googleapis.com",
                 );
+              const isTypingThisMessage = typingReveal?.messageId === message.id;
+              const displayedContent = isTypingThisMessage
+                ? typingReveal.fullText.slice(0, typingReveal.shownLength)
+                : message.content;
+              const thinkingSteps = !isUser
+                ? parseThinkingSteps(message.metadata)
+                : [];
+              const dataActionResult = !isUser
+                ? parseDataActionResult(message.metadata)
+                : null;
 
               return (
                 <div
@@ -2610,7 +3574,7 @@ export default function FloatingChatWidget({
                   )}
                 >
                   {!isUser && (
-                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#0f2b4d] text-amber-400 shadow-xs">
+                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-[#0f2b4d] text-white shadow-xs">
                       <Bot className="size-4" aria-hidden="true" />
                     </span>
                   )}
@@ -2626,7 +3590,7 @@ export default function FloatingChatWidget({
                     {!isUser && (
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[11px] font-bold text-foreground">
-                          {message.senderName || "Hermes AI"}
+                          {message.senderName || "Bunglon Assistant (SKALA AI)"}
                         </span>
                         <span
                           className={cn(
@@ -2640,30 +3604,67 @@ export default function FloatingChatWidget({
                             ? msgIsGemini
                               ? "Gemini AI"
                               : "Gateway CLI"
-                            : "ERP Engine"}
+                            : "SKALA Engine"}
                         </span>
                       </div>
                     )}
 
+                    {!isUser && !isTypingThisMessage && thinkingSteps.length > 0 && (
+                      <BunglonMessageExtras
+                        thinkingSteps={thinkingSteps}
+                        dataActionResult={null}
+                      />
+                    )}
+
                     <p className="whitespace-pre-wrap break-words text-xs leading-relaxed">
-                      {message.content}
+                      {displayedContent}
+                      {isTypingThisMessage && (
+                        <span
+                          aria-hidden="true"
+                          className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-500 align-middle"
+                        />
+                      )}
                     </p>
 
-                    {message.attachments.length > 0 && (
-                      <div className="space-y-2 pt-0.5">
-                        {message.attachments.map((att) => (
-                          <ChatAttachmentCard
-                            key={att.id}
-                            attachment={att}
-                            isOwnMessage={isUser}
-                            allowForward
-                            channels={bootstrap?.channels ?? []}
-                            users={teamUsers}
-                            directRoomByUserId={directRoomByUserId}
-                            onForwardSuccess={() => void mutateBootstrap()}
-                          />
-                        ))}
+                    {isTypingThisMessage ? (
+                      <div className="flex items-center justify-between gap-2 text-[10px] text-emerald-600 dark:text-emerald-400">
+                        <span className="font-medium italic">
+                          ✍️ Bunglon sedang mengetik...
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setTypingReveal(null)}
+                          className="underline hover:text-foreground"
+                        >
+                          Tampilkan penuh
+                        </button>
                       </div>
+                    ) : (
+                      <>
+                        {dataActionResult && (
+                          <BunglonMessageExtras
+                            thinkingSteps={[]}
+                            dataActionResult={dataActionResult}
+                          />
+                        )}
+
+                        {message.attachments.length > 0 && (
+                          <div className="space-y-2 pt-0.5">
+                            {message.attachments.map((att) => (
+                              <ChatAttachmentCard
+                                key={att.id}
+                                attachment={att}
+                                isOwnMessage={isUser}
+                                allowForward
+                                channels={bootstrap?.channels ?? []}
+                                users={teamUsers}
+                                directRoomByUserId={directRoomByUserId}
+                                onForwardSuccess={() => void mutateBootstrap()}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
 
                     <p
@@ -2679,10 +3680,28 @@ export default function FloatingChatWidget({
               );
             })
           )}
+          {sendingHermes && pendingHermesPrompt && (
+            <div className="flex justify-end gap-2">
+              <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-[#0f2b4d] px-3 py-2.5 text-white shadow-xs dark:bg-primary dark:text-primary-foreground">
+                <p className="whitespace-pre-wrap break-words text-xs leading-relaxed">
+                  {pendingHermesPrompt}
+                </p>
+              </div>
+            </div>
+          )}
+          {sendingHermes && (
+            <BunglonThinkingBubble
+              statusText={
+                BUNGLON_THINKING_MESSAGES[
+                  thinkingTickIdx % BUNGLON_THINKING_MESSAGES.length
+                ]
+              }
+            />
+          )}
           <div ref={hermesMessagesEndRef} />
         </div>
 
-        {/* Quick prompt chips + Hermes Composer */}
+        {/* Quick prompt chips + Bunglon Composer */}
         <div className="border-t border-border bg-card p-2.5 space-y-2">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {HERMES_QUICK_PROMPTS.map((chip) => (
@@ -2690,9 +3709,14 @@ export default function FloatingChatWidget({
                 key={chip.label}
                 type="button"
                 onClick={() => {
-                  if (chip.openDocForm) {
+                  if (chip.openDataForm) {
+                    setDataActionType(chip.openDataForm);
+                    setShowDataInputForm(true);
+                    setShowHermesDocForm(false);
+                  } else if (chip.openDocForm) {
                     setDocType(chip.openDocForm);
                     setShowHermesDocForm(true);
+                    setShowDataInputForm(false);
                   } else {
                     setHermesInput(chip.prompt);
                   }
@@ -2710,14 +3734,14 @@ export default function FloatingChatWidget({
               value={hermesInput}
               onChange={(event) => setHermesInput(event.target.value)}
               onKeyDown={handleHermesTextareaKeyDown}
-              placeholder="Minta Hermes buat dokumen, lampiran, atau analisis proyek..."
+              placeholder="Tanya Bunglon, input laporan/tiket/catatan, atau buat PDF..."
               rows={2}
               className="mt-0 min-h-10 max-h-28 resize-none text-xs"
             />
             <Button
               type="button"
               size="icon"
-              aria-label="Kirim ke Hermes AI"
+              aria-label="Kirim ke Bunglon AI"
               disabled={sendingHermes || !hermesInput.trim()}
               onClick={() => void handleSendHermesPrompt()}
               className="size-10 shrink-0 rounded-xl bg-[#0f2b4d] text-amber-400 hover:bg-[#173d6c]"
@@ -2740,7 +3764,7 @@ export default function FloatingChatWidget({
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          aria-label="Buka Chat Tim dan Hermes AI"
+          aria-label="Buka Chat Tim dan Bunglon AI"
           className="group relative inline-flex h-12 items-center gap-2.5 rounded-full border border-white/15 bg-[#0f2b4d] px-3.5 text-white shadow-[0_14px_34px_-8px_rgba(15,43,77,0.6)] transition-all hover:scale-[1.03] hover:bg-[#143763] active:scale-[0.98] dark:border-amber-400/30"
         >
           <span className="relative flex size-7 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
@@ -2751,7 +3775,7 @@ export default function FloatingChatWidget({
             />
           </span>
           <span className="hidden text-xs font-bold tracking-wide sm:inline">
-            Chat &amp; Hermes
+            Chat &amp; Bunglon
           </span>
           {totalUnread > 0 && (
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-extrabold text-slate-950 tabular-nums shadow-xs">
@@ -2761,7 +3785,7 @@ export default function FloatingChatWidget({
         </button>
       ) : (
         <section
-          aria-label="Widget Chat Tim & Hermes AI"
+          aria-label="Widget Chat Tim & Bunglon AI"
           className={cn(
             "flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-[0_24px_60px_-15px_rgba(15,43,77,0.45)] transition-[width,height] duration-200 dark:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]",
             isMaximized
@@ -2782,7 +3806,7 @@ export default function FloatingChatWidget({
                 </span>
                 <div className="min-w-0">
                   <h2 className="truncate text-xs font-extrabold tracking-wide text-white sm:text-sm">
-                    Skala Hub &amp; Hermes AI
+                    Skala Hub &amp; Bunglon AI
                   </h2>
                   <p className="truncate text-[10px] text-slate-300">
                     {effectiveUserName} · {getRoleLabel(effectiveUserRole)}
@@ -2865,12 +3889,12 @@ export default function FloatingChatWidget({
                   className={cn(
                     "size-3.5",
                     activeTab === "hermes"
-                      ? "text-amber-600"
-                      : "text-amber-300",
+                      ? "text-emerald-600"
+                      : "text-emerald-300",
                   )}
                   aria-hidden="true"
                 />
-                <span>Hermes AI</span>
+                <span>Bunglon AI</span>
                 <span
                   className={cn(
                     "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
@@ -2887,7 +3911,7 @@ export default function FloatingChatWidget({
                     ? "Gemini AI"
                     : gatewayOnline
                       ? "Gateway CLI"
-                      : "ERP Engine"}
+                      : "SKALA Engine"}
                 </span>
               </button>
             </div>
