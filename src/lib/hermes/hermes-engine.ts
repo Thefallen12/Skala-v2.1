@@ -14,11 +14,17 @@ import {
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
 import {
+  calculateWeightedProjectProgress,
   toJakartaDateKey,
   toJakartaDayStartDate,
 } from "@/lib/project-progress";
 import { getJakartaDayRange } from "@/lib/habit-date";
 import { sendNotification } from "@/lib/notifications";
+import {
+  getPaidProjectTicketRealization,
+  type PaidProjectTicketRealization,
+  type ProjectFundCategory,
+} from "@/lib/project-realization";
 import {
   createBrandedQrDataUrl,
   getDocumentHeaderLogoDataUrl,
@@ -73,23 +79,69 @@ export interface HermesGatewayStatus {
   installCommands: string[];
 }
 
+export interface ErpFundCategoryBreakdown {
+  count: number;
+  requestedAmount: number;
+  requestedFormatted: string;
+  paidAmount: number;
+  paidFormatted: string;
+}
+
+export interface ErpProjectFundTicketItem {
+  ticketNumber: string;
+  title: string;
+  fundCategory: ProjectFundCategory;
+  fundCategoryLabel: string;
+  status: string;
+  paid: boolean;
+  paymentStatusLabel: string;
+  amount: number;
+  amountFormatted: string;
+  requesterName: string;
+  createdAt: string;
+}
+
+export interface ErpProjectFundRecap {
+  totalTicketsCount: number;
+  totalRequestedAmount: number;
+  totalRequestedFormatted: string;
+  totalPaidAmount: number;
+  totalPaidFormatted: string;
+  remainingFromRequestedAmount: number;
+  remainingFromRequestedFormatted: string;
+  remainingFromPaidAmount: number;
+  remainingFromPaidFormatted: string;
+  absorptionRequestedPct: number;
+  absorptionPaidPct: number;
+  byCategory: {
+    TUKANG: ErpFundCategoryBreakdown;
+    BAHAN: ErpFundCategoryBreakdown;
+    SEWA: ErpFundCategoryBreakdown;
+    INVENTARIS: ErpFundCategoryBreakdown;
+    OPERASIONAL: ErpFundCategoryBreakdown;
+  };
+  tickets: ErpProjectFundTicketItem[];
+}
+
 export interface ErpProjectSummary {
   id: string;
   code: string;
   name: string;
   title: string;
   kelompokTani: string;
+  address: string;
   location: string | null;
+  picName: string | null;
   progress: number;
   status: string;
   paguAmount: number;
   paguFormatted: string;
   clientName: string | null;
   vendor: string | null;
+  fundRecap: ErpProjectFundRecap;
 }
 
 export interface ErpSelectedProjectDetail extends ErpProjectSummary {
-  address: string;
   jenisPekerjaan: string | null;
   budgetAmount: number;
   budgetFormatted: string;
@@ -140,6 +192,7 @@ export interface ErpSelectedTicketDetail {
 export interface HermesErpContextSummary {
   activeProjectsCount: number;
   topProjects: ErpProjectSummary[];
+  matchedProjects: ErpProjectSummary[];
   selectedProject: ErpSelectedProjectDetail | null;
   selectedTicket: ErpSelectedTicketDetail | null;
   pendingTicketsCount: number;
@@ -154,6 +207,22 @@ export interface HermesErpContextSummary {
     amountFormatted: string;
     requesterName: string | null;
     projectName: string | null;
+    createdAt: string;
+  }>;
+  matchedTickets: Array<{
+    ticketNumber: string;
+    title: string;
+    projectName: string;
+    projectCode: string;
+    picName: string | null;
+    fundCategory: ProjectFundCategory;
+    fundCategoryLabel: string;
+    status: string;
+    paid: boolean;
+    paymentStatusLabel: string;
+    amount: number;
+    amountFormatted: string;
+    requesterName: string;
     createdAt: string;
   }>;
   lowStockItems: Array<{
@@ -433,7 +502,7 @@ export async function callGeminiApi(params: {
           },
           contents,
           generationConfig: {
-            temperature: 0.3,
+            temperature: 0.1,
           },
         }),
         signal: AbortSignal.timeout(10000),
@@ -602,9 +671,385 @@ export async function checkHermesGatewayStatus(
   }
 }
 
+const FUND_CATEGORY_LABELS: Record<ProjectFundCategory, string> = {
+  TUKANG: "Ambilan Tukang",
+  BAHAN: "Pembelanjaan Bahan",
+  SEWA: "Rumah & Kendaraan Sewa",
+  INVENTARIS: "Barang Inventaris",
+  OPERASIONAL: "Operasional & Lainnya",
+};
+
+const SEWA_RENTAL_TEXT_PATTERN =
+  /rumah\s*sewa|mess\s*(tukang|pekerja|proyek)?|kontrakan|basecamp|kendaraan\s*sewa|sewa\s*(rumah|mess|kos|kendaraan|armada|alat|truk|truck|mobil|pickup|excavator|molen|genset|stamper)|\bsewa\b/i;
+
+const QUERY_STOP_WORDS = new Set([
+  "berapa",
+  "sudah",
+  "belum",
+  "pengeluaran",
+  "pemasukan",
+  "anggaran",
+  "realisasi",
+  "cair",
+  "lunas",
+  "pending",
+  "dana",
+  "uang",
+  "biaya",
+  "total",
+  "jumlah",
+  "project",
+  "proyek",
+  "progres",
+  "progress",
+  "tiket",
+  "ticket",
+  "pengajuan",
+  "pic",
+  "nya",
+  "yang",
+  "untuk",
+  "dengan",
+  "dari",
+  "saat",
+  "ini",
+  "sekarang",
+  "tolong",
+  "bunglon",
+  "skala",
+  "assistant",
+  "hermes",
+  "halo",
+  "coba",
+  "cek",
+  "lihat",
+  "data",
+  "info",
+  "infokan",
+  "ringkas",
+  "rincian",
+  "detail",
+  "rekap",
+  "dong",
+  "min",
+  "pak",
+  "ibu",
+  "mas",
+  "mbak",
+  "apa",
+  "saja",
+  "mana",
+  "bagaimana",
+  "gimana",
+  "kapan",
+  "atas",
+  "nama",
+  "di",
+  "ke",
+  "pada",
+  "dan",
+  "atau",
+]);
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractQueryTokens(queryText?: string | null): string[] {
+  if (!queryText) return [];
+  const normalized = normalizeSearchText(queryText);
+  if (!normalized) return [];
+  const tokens = normalized
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3 && !QUERY_STOP_WORDS.has(t));
+  return Array.from(new Set(tokens));
+}
+
+function cleanCatalogStockName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/½/g, "1/2")
+    .replace(/1[,.]5/g, "1/2")
+    .replace(/[\/,\-_x×]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function classifyFundCategoryLikeTab(ticket: {
+  title: string;
+  type?: string | null;
+  ticketType?: string | null;
+  requestCategory?: string | null;
+  fieldCategory?: string | null;
+  fundCategory?: ProjectFundCategory | null;
+  items?: Array<{ itemName: string }>;
+}): ProjectFundCategory {
+  const title = (ticket.title || "").toLowerCase();
+  const desc = (ticket.items ?? [])
+    .map((item) => item.itemName.toLowerCase())
+    .join(" ");
+  const text = `${title} ${desc}`;
+  const reqCat = (ticket.requestCategory || "").toUpperCase();
+  const fieldCat = (ticket.fieldCategory || "").toUpperCase();
+  const type = (ticket.type || "").toUpperCase();
+  const ticketType = (ticket.ticketType || "").toUpperCase();
+
+  if (
+    ticket.fundCategory === "SEWA" ||
+    reqCat === "HOUSE_RENTAL" ||
+    reqCat === "VEHICLE_RENTAL" ||
+    reqCat === "EQUIPMENT_REQUEST" ||
+    fieldCat === "HOUSE_RENTAL" ||
+    fieldCat === "VEHICLE_RENTAL" ||
+    fieldCat === "RENTAL" ||
+    ticketType === "EQUIPMENT_REQUEST" ||
+    ticketType === "HOUSE_RENTAL" ||
+    ticketType === "VEHICLE_RENTAL" ||
+    ticketType === "EQUIPMENT_RENTAL" ||
+    SEWA_RENTAL_TEXT_PATTERN.test(text)
+  ) {
+    return "SEWA";
+  }
+
+  if (fieldCat === "HAULING" || /langsir/.test(text)) {
+    return "OPERASIONAL";
+  }
+
+  if (
+    ticket.fundCategory === "TUKANG" ||
+    fieldCat === "LABOR" ||
+    reqCat === "KASBON" ||
+    /tukang|mandor|upah|kasbon|gaji|ambilan|tenaga|pekerja|borongan|ongkos/.test(
+      text,
+    )
+  ) {
+    return "TUKANG";
+  }
+
+  if (
+    ticket.fundCategory === "INVENTARIS" ||
+    /inventaris|alat|mesin|genset|molen|peralatan|perkakas|gerobak|scaffolding|helm|rompi|cangkul|meteran|equipment|aset/.test(
+      text,
+    )
+  ) {
+    return "INVENTARIS";
+  }
+
+  if (
+    ticket.fundCategory === "BAHAN" ||
+    type === "MATERIAL" ||
+    reqCat === "MATERIAL" ||
+    reqCat === "WAREHOUSE" ||
+    reqCat === "STOCK" ||
+    reqCat === "NEW_PURCHASE" ||
+    reqCat === "MATERIAL_CONTRACT" ||
+    fieldCat === "MATERIAL" ||
+    fieldCat === "DIRECT_STORE" ||
+    /bahan|material|semen|pasir|batu|besi|cat|keramik|kayu|paku|pipa|bata|toko|triplek|baut|seng/.test(
+      text,
+    )
+  ) {
+    return "BAHAN";
+  }
+
+  return "OPERASIONAL";
+}
+
+function buildProjectFundRecap(
+  contractValue: number,
+  realization: PaidProjectTicketRealization | undefined,
+  stockCatalog: Array<{ name: string; cleanName: string; unitPrice: number }>,
+): ErpProjectFundRecap {
+  const buckets: Record<
+    ProjectFundCategory,
+    { count: number; requested: number; paid: number }
+  > = {
+    TUKANG: { count: 0, requested: 0, paid: 0 },
+    BAHAN: { count: 0, requested: 0, paid: 0 },
+    SEWA: { count: 0, requested: 0, paid: 0 },
+    INVENTARIS: { count: 0, requested: 0, paid: 0 },
+    OPERASIONAL: { count: 0, requested: 0, paid: 0 },
+  };
+
+  let grandRequested = 0;
+  let grandPaid = 0;
+  const tickets: ErpProjectFundTicketItem[] = [];
+
+  for (const t of realization?.tickets ?? []) {
+    if (String(t.status) === TicketStatus.REJECTED) continue;
+    const catKey = classifyFundCategoryLikeTab(t);
+    let amountNum = Number(t.amount || 0);
+    if (!Number.isFinite(amountNum)) amountNum = 0;
+
+    if (amountNum === 0 && t.items && t.items.length > 0) {
+      let itemsSum = 0;
+      for (const it of t.items) {
+        const qty = Number(it.quantity || 0);
+        const estCost = Number(it.estimatedCost || 0);
+        const itemClean = cleanCatalogStockName(it.itemName || "");
+        const matchedStock = stockCatalog.find((s) => {
+          if (
+            s.name.trim().toLowerCase() ===
+            (it.itemName || "").trim().toLowerCase()
+          ) {
+            return true;
+          }
+          if (itemClean && s.cleanName === itemClean) return true;
+          return (
+            Boolean(itemClean) &&
+            Boolean(s.cleanName) &&
+            (s.cleanName.includes(itemClean) || itemClean.includes(s.cleanName))
+          );
+        });
+        const unitPrice =
+          matchedStock && matchedStock.unitPrice > 0
+            ? matchedStock.unitPrice
+            : estCost;
+        itemsSum += qty * (Number.isFinite(unitPrice) ? unitPrice : 0);
+      }
+      if (itemsSum > 0) {
+        amountNum = itemsSum;
+      }
+    }
+
+    const roundedAmount = Math.round(amountNum);
+    buckets[catKey].count += 1;
+    buckets[catKey].requested += roundedAmount;
+    if (t.paid) {
+      buckets[catKey].paid += roundedAmount;
+      grandPaid += roundedAmount;
+    }
+    grandRequested += roundedAmount;
+
+    tickets.push({
+      ticketNumber: t.ticketNumber,
+      title: t.title,
+      fundCategory: catKey,
+      fundCategoryLabel: FUND_CATEGORY_LABELS[catKey],
+      status: String(t.status),
+      paid: Boolean(t.paid),
+      paymentStatusLabel: t.paid ? "Lunas / Cair" : "Pending / Menunggu",
+      amount: roundedAmount,
+      amountFormatted: formatRupiah(roundedAmount),
+      requesterName: t.requesterName || "Staf Proyek",
+      createdAt: formatWibDate(t.createdAt),
+    });
+  }
+
+  const toCategorySummary = (
+    key: ProjectFundCategory,
+  ): ErpFundCategoryBreakdown => ({
+    count: buckets[key].count,
+    requestedAmount: buckets[key].requested,
+    requestedFormatted: formatRupiah(buckets[key].requested),
+    paidAmount: buckets[key].paid,
+    paidFormatted: formatRupiah(buckets[key].paid),
+  });
+
+  const remainingFromRequested = Math.max(0, contractValue - grandRequested);
+  const remainingFromPaid = Math.max(0, contractValue - grandPaid);
+
+  return {
+    totalTicketsCount: tickets.length,
+    totalRequestedAmount: grandRequested,
+    totalRequestedFormatted: formatRupiah(grandRequested),
+    totalPaidAmount: grandPaid,
+    totalPaidFormatted: formatRupiah(grandPaid),
+    remainingFromRequestedAmount: remainingFromRequested,
+    remainingFromRequestedFormatted: formatRupiah(remainingFromRequested),
+    remainingFromPaidAmount: remainingFromPaid,
+    remainingFromPaidFormatted: formatRupiah(remainingFromPaid),
+    absorptionRequestedPct:
+      contractValue > 0
+        ? Math.round((grandRequested / contractValue) * 1000) / 10
+        : 0,
+    absorptionPaidPct:
+      contractValue > 0
+        ? Math.round((grandPaid / contractValue) * 1000) / 10
+        : 0,
+    byCategory: {
+      TUKANG: toCategorySummary("TUKANG"),
+      BAHAN: toCategorySummary("BAHAN"),
+      SEWA: toCategorySummary("SEWA"),
+      INVENTARIS: toCategorySummary("INVENTARIS"),
+      OPERASIONAL: toCategorySummary("OPERASIONAL"),
+    },
+    tickets,
+  };
+}
+
+function scoreProjectAgainstQuery(
+  project: {
+    code: string;
+    title: string;
+    name: string;
+    kelompokTani: string;
+    address: string;
+    location: string | null;
+    clientName: string | null;
+    vendor: string | null;
+    fieldPic?: { name: string } | null;
+  },
+  tokens: string[],
+  rawQueryLower: string,
+): number {
+  if (tokens.length === 0 && !rawQueryLower) return 0;
+
+  const fieldEntries: Array<{ text: string; weight: number }> = [
+    { text: project.code.toLowerCase(), weight: 14 },
+    { text: project.title.toLowerCase(), weight: 11 },
+    { text: (project.fieldPic?.name ?? "").toLowerCase(), weight: 11 },
+    { text: project.name.toLowerCase(), weight: 9 },
+    { text: project.kelompokTani.toLowerCase(), weight: 9 },
+    { text: (project.address ?? "").toLowerCase(), weight: 8 },
+    { text: (project.location ?? "").toLowerCase(), weight: 8 },
+    { text: (project.clientName ?? "").toLowerCase(), weight: 4 },
+    { text: (project.vendor ?? "").toLowerCase(), weight: 4 },
+  ];
+
+  let score = 0;
+  let matchedDistinctTokens = 0;
+
+  for (const token of tokens) {
+    let tokenMatched = false;
+    for (const entry of fieldEntries) {
+      if (entry.text && entry.text.includes(token)) {
+        score += entry.weight;
+        tokenMatched = true;
+      }
+    }
+    if (tokenMatched) {
+      matchedDistinctTokens += 1;
+    }
+  }
+
+  // Bonus kuat bila kode/judul/nama PIC muncul sebagai frasa utuh
+  for (const phrase of [
+    project.code.toLowerCase(),
+    project.title.toLowerCase(),
+    project.kelompokTani.toLowerCase(),
+  ]) {
+    if (phrase.length >= 4 && rawQueryLower.includes(phrase)) {
+      score += 18;
+    }
+  }
+
+  if (matchedDistinctTokens > 1) {
+    score += matchedDistinctTokens * 15;
+  }
+
+  return score;
+}
+
 export async function loadErpContextSummary(
   projectId?: string | null,
   ticketId?: string | null,
+  queryText?: string | null,
 ): Promise<HermesErpContextSummary> {
   const activeProjectWhere = {
     isDeleted: false,
@@ -616,11 +1061,12 @@ export async function loadErpContextSummary(
 
   const cleanProjectId = projectId?.trim() || null;
   const cleanTicketId = ticketId?.trim() || null;
+  const queryTokens = extractQueryTokens(queryText);
+  const rawQueryLower = (queryText ?? "").trim().toLowerCase();
 
   const [
     activeProjectsCount,
-    rawTopProjects,
-    rawSelectedProject,
+    rawAllProjects,
     rawSelectedTicket,
     pendingTicketsCount,
     rawPendingTickets,
@@ -628,71 +1074,55 @@ export async function loadErpContextSummary(
   ] = await Promise.all([
     prisma.project.count({ where: activeProjectWhere }),
     prisma.project.findMany({
-      where: activeProjectWhere,
-      orderBy: { createdAt: "desc" },
-      take: 8,
+      where: { isDeleted: false },
+      orderBy: [{ createdAt: "desc" }],
+      take: 80,
       select: {
         id: true,
         code: true,
         name: true,
         title: true,
         kelompokTani: true,
+        address: true,
         location: true,
+        jenisPekerjaan: true,
         progress: true,
         status: true,
         pagu: true,
+        budget: true,
         clientName: true,
         vendor: true,
-      },
-    }),
-    cleanProjectId
-      ? prisma.project.findUnique({
-          where: { id: cleanProjectId },
+        startDate: true,
+        endDate: true,
+        fieldPic: {
+          select: { id: true, name: true },
+        },
+        workPoints: {
+          orderBy: { createdAt: "asc" },
           select: {
             id: true,
-            code: true,
-            name: true,
             title: true,
-            isDeleted: true,
-            kelompokTani: true,
-            address: true,
             location: true,
-            jenisPekerjaan: true,
             progress: true,
-            status: true,
-            pagu: true,
-            budget: true,
-            clientName: true,
-            vendor: true,
-            startDate: true,
-            endDate: true,
-            workPoints: {
-              orderBy: { createdAt: "asc" },
-              select: {
-                id: true,
-                title: true,
-                location: true,
-                progress: true,
-                proposedTotalWage: true,
-                approvedTotalWage: true,
-              },
-            },
-            dailyReports: {
-              orderBy: { reportDate: "desc" },
-              take: 5,
-              select: {
-                id: true,
-                reportDate: true,
-                weather: true,
-                workersCount: true,
-                progress: true,
-                workSummary: true,
-                notes: true,
-              },
-            },
+            proposedTotalWage: true,
+            approvedTotalWage: true,
           },
-        })
-      : Promise.resolve(null),
+        },
+        dailyReports: {
+          orderBy: { reportDate: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            reportDate: true,
+            weather: true,
+            workersCount: true,
+            progress: true,
+            workSummary: true,
+            notes: true,
+          },
+        },
+      },
+    }),
     cleanTicketId
       ? prisma.ticket.findUnique({
           where: { id: cleanTicketId },
@@ -726,7 +1156,7 @@ export async function loadErpContextSummary(
     prisma.ticket.findMany({
       where: pendingTicketWhere,
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 10,
       select: {
         id: true,
         ticketNumber: true,
@@ -756,82 +1186,278 @@ export async function loadErpContextSummary(
     }),
   ]);
 
-  const mapProject = (p: (typeof rawTopProjects)[number]): ErpProjectSummary => {
-    const paguAmount = parseScaledAmount(p.pagu);
+  // Pastikan proyek yang diminta eksplisit ikut dimuat walau berada di luar 80 proyek terbaru
+  let allProjects = rawAllProjects;
+  if (cleanProjectId && !rawAllProjects.some((p) => p.id === cleanProjectId)) {
+    const explicitProj = await prisma.project.findFirst({
+      where: { id: cleanProjectId, isDeleted: false },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        title: true,
+        kelompokTani: true,
+        address: true,
+        location: true,
+        jenisPekerjaan: true,
+        progress: true,
+        status: true,
+        pagu: true,
+        budget: true,
+        clientName: true,
+        vendor: true,
+        startDate: true,
+        endDate: true,
+        fieldPic: {
+          select: { id: true, name: true },
+        },
+        workPoints: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            progress: true,
+            proposedTotalWage: true,
+            approvedTotalWage: true,
+          },
+        },
+        dailyReports: {
+          orderBy: { reportDate: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            reportDate: true,
+            weather: true,
+            workersCount: true,
+            progress: true,
+            workSummary: true,
+            notes: true,
+          },
+        },
+      },
+    });
+    if (explicitProj) {
+      allProjects = [explicitProj, ...rawAllProjects];
+    }
+  }
+
+  let realizationMap = new Map<string, PaidProjectTicketRealization>();
+  if (allProjects.length > 0) {
+    try {
+      realizationMap = await getPaidProjectTicketRealization(
+        allProjects.map((p) => p.id),
+      );
+    } catch (realizationErr) {
+      console.warn(
+        "[Bunglon Context] Gagal memuat getPaidProjectTicketRealization:",
+        realizationErr,
+      );
+    }
+  }
+
+  const stockCatalog = rawStockItems.map((item) => ({
+    name: item.name,
+    cleanName: cleanCatalogStockName(item.name),
+    unitPrice: parseScaledAmount(item.unitPrice),
+  }));
+
+  const buildSummaryForProject = (
+    p: (typeof allProjects)[number],
+  ): ErpProjectSummary => {
+    const rawPaguAmount = parseScaledAmount(p.pagu);
+    const workPointsTotal = p.workPoints.reduce(
+      (sum, wp) =>
+        sum +
+        parseScaledAmount(wp.approvedTotalWage ?? wp.proposedTotalWage),
+      0,
+    );
+    const paguAmount = rawPaguAmount > 0 ? rawPaguAmount : workPointsTotal;
+    const hasWorkPointProgress = p.workPoints.some((wp) => wp.progress > 0);
+    const dynamicProgress = hasWorkPointProgress
+      ? calculateWeightedProjectProgress(p.workPoints)
+      : Number(p.progress ?? 0);
+
+    const fundRecap = buildProjectFundRecap(
+      paguAmount,
+      realizationMap.get(p.id),
+      stockCatalog,
+    );
+
     return {
       id: p.id,
       code: p.code,
       name: p.name,
       title: p.title,
       kelompokTani: p.kelompokTani,
+      address: p.address,
       location: p.location ?? null,
-      progress: Number(p.progress ?? 0),
+      picName: p.fieldPic?.name ?? null,
+      progress: dynamicProgress,
       status: String(p.status),
       paguAmount,
       paguFormatted: formatRupiah(paguAmount),
       clientName: p.clientName ?? null,
       vendor: p.vendor ?? null,
+      fundRecap,
     };
   };
 
-  const topProjects = rawTopProjects.map(mapProject);
+  const buildSelectedDetailForProject = (
+    p: (typeof allProjects)[number],
+    summary: ErpProjectSummary,
+  ): ErpSelectedProjectDetail => ({
+    ...summary,
+    jenisPekerjaan: p.jenisPekerjaan ?? null,
+    budgetAmount: parseScaledAmount(p.budget),
+    budgetFormatted: formatRupiah(parseScaledAmount(p.budget)),
+    startDate: p.startDate ? formatWibDate(p.startDate) : null,
+    endDate: p.endDate ? formatWibDate(p.endDate) : null,
+    workPoints: p.workPoints.map((wp) => {
+      const proposed = parseScaledAmount(wp.proposedTotalWage);
+      const approved =
+        wp.approvedTotalWage !== null && wp.approvedTotalWage !== undefined
+          ? parseScaledAmount(wp.approvedTotalWage)
+          : null;
+      return {
+        id: wp.id,
+        title: wp.title,
+        location: wp.location ?? null,
+        progress: Number(wp.progress ?? 0),
+        proposedTotalWageAmount: proposed,
+        proposedTotalWageFormatted: formatRupiah(proposed),
+        approvedTotalWageAmount: approved,
+        approvedTotalWageFormatted:
+          approved !== null ? formatRupiah(approved) : null,
+      };
+    }),
+    latestDailyReports: p.dailyReports.map((dr) => ({
+      id: dr.id,
+      reportDate: formatWibDate(dr.reportDate),
+      weather: dr.weather ?? null,
+      workersCount: dr.workersCount ?? 0,
+      progress: dr.progress ?? null,
+      workSummary: dr.workSummary ?? null,
+      notes: dr.notes ?? null,
+    })),
+  });
 
-  const selectedProject: ErpSelectedProjectDetail | null =
-    rawSelectedProject && !rawSelectedProject.isDeleted
-      ? {
-          ...mapProject(rawSelectedProject),
-          address: rawSelectedProject.address,
-          jenisPekerjaan: rawSelectedProject.jenisPekerjaan ?? null,
-          budgetAmount: parseScaledAmount(rawSelectedProject.budget),
-          budgetFormatted: formatRupiah(
-            parseScaledAmount(rawSelectedProject.budget),
-          ),
-          startDate: rawSelectedProject.startDate
-            ? formatWibDate(rawSelectedProject.startDate)
-            : null,
-          endDate: rawSelectedProject.endDate
-            ? formatWibDate(rawSelectedProject.endDate)
-            : null,
-          workPoints: (rawSelectedProject.workPoints ?? []).map((wp) => {
-            const proposed = parseScaledAmount(wp.proposedTotalWage);
-            const approved =
-              wp.approvedTotalWage !== null &&
-              wp.approvedTotalWage !== undefined
-                ? parseScaledAmount(wp.approvedTotalWage)
-                : null;
-            return {
-              id: wp.id,
-              title: wp.title,
-              location: wp.location ?? null,
-              progress: Number(wp.progress ?? 0),
-              proposedTotalWageAmount: proposed,
-              proposedTotalWageFormatted: formatRupiah(proposed),
-              approvedTotalWageAmount: approved,
-              approvedTotalWageFormatted:
-                approved !== null ? formatRupiah(approved) : null,
-            };
-          }),
-          latestDailyReports: (rawSelectedProject.dailyReports ?? []).map(
-            (dr) => ({
-              id: dr.id,
-              reportDate: formatWibDate(dr.reportDate),
-              weather: dr.weather ?? null,
-              workersCount: dr.workersCount ?? 0,
-              progress: dr.progress ?? null,
-              workSummary: dr.workSummary ?? null,
-              notes: dr.notes ?? null,
-            }),
-          ),
+  const projectRecordsWithSummary = allProjects.map((raw) => ({
+    raw,
+    summary: buildSummaryForProject(raw),
+    score: scoreProjectAgainstQuery(raw, queryTokens, rawQueryLower),
+  }));
+
+  const topProjects = projectRecordsWithSummary
+    .filter(
+      (entry) =>
+        entry.raw.status !== ProjectStatus.DONE &&
+        entry.raw.status !== ProjectStatus.COMPLETED,
+    )
+    .slice(0, 8)
+    .map((entry) => entry.summary);
+
+  const matchedEntries = projectRecordsWithSummary
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+
+  const matchedProjects = matchedEntries.map((entry) => entry.summary);
+
+  const explicitMatch = cleanProjectId
+    ? projectRecordsWithSummary.find((entry) => entry.raw.id === cleanProjectId)
+    : undefined;
+  const chosenProjectEntry = explicitMatch ?? matchedEntries[0] ?? null;
+
+  const selectedProject: ErpSelectedProjectDetail | null = chosenProjectEntry
+    ? buildSelectedDetailForProject(
+        chosenProjectEntry.raw,
+        chosenProjectEntry.summary,
+      )
+    : null;
+
+  // Map jumlah realisasi per ticketId / ticketNumber agar tiket stok gudang tidak tampil Rp 0
+  const valuedAmountByTicketNumber = new Map<string, number>();
+  for (const entry of projectRecordsWithSummary) {
+    for (const t of entry.summary.fundRecap.tickets) {
+      if (!valuedAmountByTicketNumber.has(t.ticketNumber)) {
+        valuedAmountByTicketNumber.set(t.ticketNumber, t.amount);
+      }
+    }
+  }
+
+  const matchedTicketsPool: Array<{
+    score: number;
+    item: HermesErpContextSummary["matchedTickets"][number];
+  }> = [];
+  if (queryTokens.length > 0 || rawQueryLower.includes("tkt-")) {
+    for (const entry of projectRecordsWithSummary) {
+      const p = entry.summary;
+      for (const t of p.fundRecap.tickets) {
+        const ticketNumberLower = t.ticketNumber.toLowerCase();
+        const combinedText = [
+          ticketNumberLower,
+          t.title.toLowerCase(),
+          t.requesterName.toLowerCase(),
+          p.title.toLowerCase(),
+          p.kelompokTani.toLowerCase(),
+          p.address.toLowerCase(),
+          (p.picName ?? "").toLowerCase(),
+        ].join(" ");
+        let tScore = 0;
+        if (rawQueryLower.includes(ticketNumberLower)) {
+          tScore += 30;
         }
-      : null;
+        for (const token of queryTokens) {
+          if (combinedText.includes(token)) {
+            tScore += 5;
+          }
+        }
+        if (entry.score > 0) {
+          tScore += Math.min(entry.score, 25);
+        }
+        if (tScore > 0) {
+          matchedTicketsPool.push({
+            score: tScore,
+            item: {
+              ticketNumber: t.ticketNumber,
+              title: t.title,
+              projectName: p.title || p.kelompokTani,
+              projectCode: p.code,
+              picName: p.picName,
+              fundCategory: t.fundCategory,
+              fundCategoryLabel: t.fundCategoryLabel,
+              status: t.status,
+              paid: t.paid,
+              paymentStatusLabel: t.paymentStatusLabel,
+              amount: t.amount,
+              amountFormatted: t.amountFormatted,
+              requesterName: t.requesterName,
+              createdAt: t.createdAt,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  const matchedTickets = matchedTicketsPool
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map((entry) => entry.item);
 
   const selectedTicket: ErpSelectedTicketDetail | null = rawSelectedTicket
     ? (() => {
-        const amount =
+        const valuedFromRecap = valuedAmountByTicketNumber.get(
+          rawSelectedTicket.ticketNumber,
+        );
+        const rawAmount =
           rawSelectedTicket.totalAmount !== null &&
           rawSelectedTicket.totalAmount !== undefined
             ? parseScaledAmount(rawSelectedTicket.totalAmount)
             : Number(rawSelectedTicket.requestedAmount ?? 0);
+        const amount =
+          rawAmount > 0 ? rawAmount : (valuedFromRecap ?? 0);
         return {
           id: rawSelectedTicket.id,
           ticketNumber: rawSelectedTicket.ticketNumber,
@@ -864,10 +1490,14 @@ export async function loadErpContextSummary(
     : null;
 
   const latestPendingTickets = rawPendingTickets.map((t) => {
-    const amount =
+    const rawAmount =
       t.totalAmount !== null && t.totalAmount !== undefined
         ? parseScaledAmount(t.totalAmount)
         : Number(t.requestedAmount ?? 0);
+    const amount =
+      rawAmount > 0
+        ? rawAmount
+        : (valuedAmountByTicketNumber.get(t.ticketNumber) ?? 0);
     return {
       id: t.id,
       ticketNumber: t.ticketNumber,
@@ -906,12 +1536,68 @@ export async function loadErpContextSummary(
   return {
     activeProjectsCount,
     topProjects,
+    matchedProjects,
     selectedProject,
     selectedTicket,
     pendingTicketsCount,
     latestPendingTickets,
+    matchedTickets,
     lowStockItems,
     totalStockItemsCount: rawStockItems.length,
+  };
+}
+
+function trimFundRecapForSummaryList(
+  project: ErpProjectSummary,
+): Omit<ErpProjectSummary, "fundRecap"> & {
+  fundRecap: Omit<ErpProjectFundRecap, "tickets">;
+} {
+  const { tickets: _omitted, ...recapSummary } = project.fundRecap;
+  void _omitted;
+  return {
+    ...project,
+    fundRecap: recapSummary,
+  };
+}
+
+function buildCompactContextForLlm(erpContext: HermesErpContextSummary) {
+  return {
+    activeProjectsCount: erpContext.activeProjectsCount,
+    pendingTicketsCount: erpContext.pendingTicketsCount,
+    totalStockItemsCount: erpContext.totalStockItemsCount,
+    selectedProject: erpContext.selectedProject
+      ? {
+          ...erpContext.selectedProject,
+          fundRecap: {
+            ...erpContext.selectedProject.fundRecap,
+            tickets: erpContext.selectedProject.fundRecap.tickets.slice(0, 30),
+          },
+        }
+      : null,
+    matchedProjects: erpContext.matchedProjects.map((project, index) =>
+      index === 0 && !erpContext.selectedProject
+        ? {
+            ...project,
+            fundRecap: {
+              ...project.fundRecap,
+              tickets: project.fundRecap.tickets.slice(0, 30),
+            },
+          }
+        : index < 3
+          ? {
+              ...project,
+              fundRecap: {
+                ...project.fundRecap,
+                tickets: project.fundRecap.tickets.slice(0, 10),
+              },
+            }
+          : trimFundRecapForSummaryList(project),
+    ),
+    matchedTickets: erpContext.matchedTickets.slice(0, 20),
+    topProjects: erpContext.topProjects.map(trimFundRecapForSummaryList),
+    selectedTicket: erpContext.selectedTicket,
+    latestPendingTickets: erpContext.latestPendingTickets,
+    lowStockItems: erpContext.lowStockItems,
   };
 }
 
@@ -920,17 +1606,20 @@ export async function callHermesGateway(
 ): Promise<string | null> {
   const resolved = resolveValidatedGatewayUrl(input.customGatewayUrl);
   const geminiApiKey = resolveGeminiApiKey(input.customApiKey);
+  const compactContext = buildCompactContextForLlm(input.erpContext);
 
   const systemPrompt = [
-    "Kamu adalah **Bunglon Assistant (SKALA AI)** — rekan kerja asisten AI yang hangat, natural, ramah, cerdas, dan solutif di tim **PT Skala Prioritas Engineering** (bidang konstruksi, teknik sipil, irigasi/rehabilitasi lahan, manajemen proyek, logistik material, dan keuangan).",
-    "Gunakan gaya bahasa Indonesia sehari-hari kantor yang luwes dan natural seperti rekan kerja manusia (misalnya menyapa hangat, 'Siap, barusan saya cek...', 'Oke, ini rinciannya ya...', menyebut nama pengguna dengan sopan), JANGAN kaku atau terdengar seperti robot/template.",
-    "Gunakan HANYA data ERP faktual di bawah ini untuk menyebut angka proyek, progres, tiket, atau stok gudang. Jangan mengarang data yang tidak tercantum.",
-    "Kamu bisa membantu user: (1) diskusi santai & cek data ERP live, (2) membantu menginput Laporan Harian/Progres Proyek, Tiket Pengajuan, atau Catatan Kerja ke sistem, serta (3) menyusun 8 jenis dokumen/laporan PDF resmi ber-Kop & QR Code.",
+    "Kamu adalah **Bunglon Assistant (SKALA AI)** — rekan kerja asisten AI yang hangat, natural, teliti, dan berbasis fakta database di tim **PT Skala Prioritas Engineering** (bidang konstruksi, teknik sipil, irigasi/rehabilitasi lahan, manajemen proyek, logistik material, dan keuangan).",
+    "Gunakan gaya bahasa Indonesia sehari-hari kantor yang luwes dan natural seperti rekan kerja manusia (misalnya menyapa hangat, 'Siap, barusan saya cek...', menyebut nama pengguna dengan sopan), JANGAN kaku atau terdengar seperti robot.",
+    "ATURAN ANTI-HALUSINASI WAJIB: Gunakan HANYA angka, status, nomor tiket, nama proyek, alamat/lokasi, dan nama PIC dari Konteks ERP Live di bawah. DILARANG keras mengarang angka, menebak pengeluaran, atau mengambil proyek dari daerah yang sama tetapi PIC berbeda.",
+    "Jika beberapa proyek berada di lokasi/desa yang mirip (misalnya Lenga), wajib cocokkan menggunakan kombinasi `title`, `kelompokTani`, `address`/`location`, dan `picName` (`fieldPic`). Prioritaskan `selectedProject` atau entri paling relevan di `matchedProjects` yang cocok dengan nama proyek/lokasi/PIC dari pertanyaan.",
+    "ATURAN PELAPORAN PENGELUARAN / REKAP DANA PROYEK: Ketika user menanyakan pengeluaran, biaya, kasbon, atau realisasi proyek, wajib sebutkan secara akurat angka dari `fundRecap` proyek tersebut: (1) **Nilai Kontrak / Pagu** (`paguFormatted`), (2) **Total Realisasi Cair / Lunas** (`fundRecap.totalPaidFormatted`), (3) **Total Dana Diajukan** (`fundRecap.totalRequestedFormatted`), (4) **Sisa Pagu Anggaran** (`fundRecap.remainingFromRequestedFormatted`), serta (5) rincian 5 kategori bila datanya > 0: **Ambilan Tukang** (`TUKANG`), **Pembelanjaan Bahan** (`BAHAN`), **Rumah & Kendaraan Sewa** (`SEWA`), **Barang Inventaris** (`INVENTARIS`), dan **Operasional** (`OPERASIONAL`) beserta jumlah tiket, total diajukan, dan total lunas/cairnya. Bedakan tegas antara *Total Realisasi Cair* (sudah lunas/dibayar) vs *Total Dana Diajukan* (termasuk yang masih pending). Jika tidak ada di konteks, katakan terus terang belum ditemukan di sistem.",
+    "Kamu bisa membantu user: (1) diskusi & analisis data ERP live, (2) menginput Laporan Harian/Progres Proyek, Tiket Pengajuan, atau Catatan Kerja ke sistem, serta (3) menyusun 8 jenis dokumen/laporan PDF resmi ber-Kop & QR Code.",
     input.userName
       ? `Pengguna aktif saat ini: ${input.userName} (Jabatan/Peran: ${input.userRole || "Staf"}).`
       : "",
     input.systemInstructionExtra ? input.systemInstructionExtra : "",
-    `Konteks ERP Live (JSON):\n${JSON.stringify(input.erpContext)}`,
+    `Konteks ERP Live (JSON):\n${JSON.stringify(compactContext)}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -964,7 +1653,7 @@ export async function callHermesGateway(
         headers,
         body: JSON.stringify({
           model,
-          temperature: 0.3,
+          temperature: 0.1,
           messages: [
             { role: "system", content: systemPrompt },
             ...historyMessages,
@@ -1785,7 +2474,11 @@ export async function generateHermesDocument(
 }> {
   const erpContext =
     input.erpContext ??
-    (await loadErpContextSummary(input.projectId, input.ticketId));
+    (await loadErpContextSummary(
+      input.projectId,
+      input.ticketId,
+      input.prompt,
+    ));
   const intent =
     input.detectedIntent ??
     detectDocumentIntent(input.prompt, input.docType);
@@ -2555,6 +3248,46 @@ export async function generateHermesDocument(
   };
 }
 
+function formatProjectFundRecapReply(p: ErpProjectSummary): string {
+  const recap = p.fundRecap;
+  const catLines = (
+    [
+      ["Ambilan Tukang", recap.byCategory.TUKANG],
+      ["Pembelanjaan Bahan", recap.byCategory.BAHAN],
+      ["Rumah & Kendaraan Sewa", recap.byCategory.SEWA],
+      ["Barang Inventaris", recap.byCategory.INVENTARIS],
+      ["Operasional & Lainnya", recap.byCategory.OPERASIONAL],
+    ] as const
+  )
+    .filter(([, b]) => b.count > 0 || b.requestedAmount > 0 || b.paidAmount > 0)
+    .map(
+      ([label, b]) =>
+        `- **${label}** (${b.count} tiket): Diajukan **${b.requestedFormatted}** · Lunas/Cair **${b.paidFormatted}**`,
+    );
+
+  const recentTicketLines = recap.tickets.slice(0, 6).map(
+    (t) =>
+      `  - \`${t.ticketNumber}\` (${t.fundCategoryLabel}) — ${t.title}: **${t.amountFormatted}** (*${t.paymentStatusLabel}*)`,
+  );
+
+  return [
+    `Barusan saya cek data **Rekap Dana** live dari database untuk proyek **${p.title}** (\`${p.code}\`):`,
+    `- **Lokasi / Alamat:** ${p.address || p.location || p.kelompokTani}`,
+    p.picName ? `- **PIC / Manajer Proyek:** ${p.picName}` : null,
+    `- **Progres Fisik / Status:** ${p.progress.toFixed(1)}% (\`${p.status}\`)`,
+    `- **Nilai Kontrak / Pagu:** **${p.paguFormatted}**`,
+    `- **Total Realisasi Cair (Lunas):** **${recap.totalPaidFormatted}** (${recap.absorptionPaidPct}% dari pagu)`,
+    `- **Total Dana Diajukan (${recap.totalTicketsCount} tiket):** **${recap.totalRequestedFormatted}** (${recap.absorptionRequestedPct}% dari pagu)`,
+    `- **Sisa Pagu Anggaran (vs Diajukan):** **${recap.remainingFromRequestedFormatted}**`,
+    catLines.length > 0 ? "\n**Rincian per Kategori:**\n" + catLines.join("\n") : null,
+    recentTicketLines.length > 0
+      ? "\n**Beberapa Tiket Terkait Terbaru:**\n" + recentTicketLines.join("\n")
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function buildBuiltinErpReply(
   message: string,
   erpContext: HermesErpContextSummary,
@@ -2576,6 +3309,17 @@ export function buildBuiltinErpReply(
     ].join("\n");
   }
 
+  const targetMatchedProject =
+    erpContext.selectedProject ?? erpContext.matchedProjects[0] ?? null;
+  if (
+    targetMatchedProject &&
+    /\b(pengeluaran|biaya|realisasi|cair|dana|rekap|kasbon|lunas|anggaran|sisa\s+pagu|habis\s+berapa|total\s+tiket)\b/i.test(
+      lower,
+    )
+  ) {
+    return formatProjectFundRecapReply(targetMatchedProject);
+  }
+
   if (/\b(stok|gudang|material|habis|menipis|minimum|sku|inventori)\b/i.test(lower)) {
     if (erpContext.lowStockItems.length === 0) {
       return `Saat ini seluruh **${erpContext.totalStockItemsCount} SKU material** di gudang berada di atas batas stok minimum. Tidak ada peringatan stok menipis.`;
@@ -2595,10 +3339,20 @@ export function buildBuiltinErpReply(
   }
 
   if (/\b(tiket|ticket|pengajuan|approval|pending|pembayaran)\b/i.test(lower)) {
+    if (erpContext.matchedTickets.length > 0) {
+      const lines = erpContext.matchedTickets.slice(0, 8).map(
+        (t) =>
+          `- **${t.ticketNumber}** (${t.projectName}) — ${t.title} | **${t.amountFormatted}** (*${t.paymentStatusLabel}*)`,
+      );
+      return [
+        `Berikut tiket yang cocok dari database (${erpContext.matchedTickets.length} ditemukan):`,
+        ...lines,
+      ].join("\n");
+    }
     if (erpContext.latestPendingTickets.length === 0) {
       return "Saat ini tidak ada tiket pengajuan aktif yang menunggu penyelesaian.";
     }
-    const lines = erpContext.latestPendingTickets.map(
+    const lines = erpContext.latestPendingTickets.slice(0, 5).map(
       (t) =>
         `- **${t.ticketNumber}** — ${t.title} | Status: \`${t.status}\` | Nilai: **${t.amountFormatted}**${t.projectName ? ` (${t.projectName})` : ""}`,
     );
@@ -2609,6 +3363,7 @@ export function buildBuiltinErpReply(
   }
 
   if (
+    targetMatchedProject &&
     /\b(proyek|project|progres|progress|pagu|lapangan|kurva|harian|titik\s+kerja)\b/i.test(
       lower,
     )
@@ -2626,11 +3381,7 @@ export function buildBuiltinErpReply(
             .join("\n")
         : "";
       return [
-        `**Detail Proyek Terpilih — ${p.title} (\`${p.code}\`)**`,
-        `- Kelompok Tani / Klien: ${p.kelompokTani}${p.clientName ? ` · ${p.clientName}` : ""}`,
-        `- Lokasi: ${p.location || p.address}`,
-        `- Status: \`${p.status}\` | Progres Fisik: **${p.progress.toFixed(1)}%**`,
-        `- Pagu Kontrak: **${p.paguFormatted}**`,
+        formatProjectFundRecapReply(p),
         wpSummary,
         "",
         `Ketik **"Buatkan laporan proyek"** atau **"Buatkan SPK / BAST"** untuk mencetak PDF resmi proyek ini.`,
@@ -2638,10 +3389,16 @@ export function buildBuiltinErpReply(
         .filter(Boolean)
         .join("\n");
     }
+  }
 
+  if (
+    /\b(proyek|project|progres|progress|pagu|lapangan|kurva|harian|titik\s+kerja)\b/i.test(
+      lower,
+    )
+  ) {
     const lines = erpContext.topProjects.slice(0, 6).map(
       (p) =>
-        `- **${p.code} — ${p.title}** (${p.location || p.kelompokTani}): Progres **${p.progress.toFixed(1)}%** · Status \`${p.status}\` · Pagu **${p.paguFormatted}**`,
+        `- **${p.code} — ${p.title}** (${p.address || p.location || p.kelompokTani}${p.picName ? ` · PIC: ${p.picName}` : ""}): Progres **${p.progress.toFixed(1)}%** · Cair **${p.fundRecap.totalPaidFormatted}** / Diajukan **${p.fundRecap.totalRequestedFormatted}** · Pagu **${p.paguFormatted}**`,
     );
     return [
       `Saat ini terdapat **${erpContext.activeProjectsCount} proyek aktif** di Skala Prioritas ERP:`,
@@ -2670,7 +3427,7 @@ export function buildBuiltinErpReply(
     `- **Tiket Pending / Proses:** ${erpContext.pendingTicketsCount} tiket`,
     `- **Stok di Bawah Batas Minimum:** ${erpContext.lowStockItems.length} item (dari ${erpContext.totalStockItemsCount} SKU)`,
     "",
-    "Mau saya bantu **cek rincian proyek/stok**, **menginput Laporan Harian / Tiket / Catatan**, atau **membuatkan dokumen & laporan PDF**? Tulis saja dengan bahasa santai ya!",
+    "Mau saya bantu **cek rincian proyek/pengeluaran/stok**, **menginput Laporan Harian / Tiket / Catatan**, atau **membuatkan dokumen & laporan PDF**? Tulis saja dengan bahasa santai ya!",
   ].join("\n");
 }
 
@@ -3255,8 +4012,18 @@ export async function runBunglonAssistantTurn(input: {
     .trim();
   const promptForIntent = cleanedPrompt || input.message.trim();
 
+  const recentUserHistory = (input.conversationHistory ?? [])
+    .filter((turn) => turn.role === "user")
+    .slice(-1)
+    .map((turn) => turn.content)
+    .join(" ");
+  const queryContextText =
+    extractQueryTokens(promptForIntent).length > 0
+      ? promptForIntent
+      : [promptForIntent, recentUserHistory].filter(Boolean).join(" ");
+
   const [erpContext, gatewayStatus] = await Promise.all([
-    loadErpContextSummary(input.projectId, input.ticketId),
+    loadErpContextSummary(input.projectId, input.ticketId, queryContextText),
     checkHermesGatewayStatus(input.customGatewayUrl, input.customApiKey),
   ]);
 
