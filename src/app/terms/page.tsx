@@ -4,16 +4,16 @@ import { JsonLdScript } from "@/components/public/JsonLdScript";
 import { PublicSiteChrome } from "@/components/public/PublicSiteChrome";
 import {
   COMPANY_PROFILE,
-  PUBLIC_PAGES,
   SITE_URL,
   absoluteUrl,
   buildSubpageJsonLd,
+  getPublicPageMeta,
 } from "@/lib/site-config";
 
-const PAGE_META = PUBLIC_PAGES[3];
+const PAGE_META = getPublicPageMeta("/terms");
 
 export const metadata: Metadata = {
-  title: PAGE_META.title,
+  title: { absolute: PAGE_META.title },
   description: PAGE_META.description,
   alternates: {
     canonical: absoluteUrl("/terms"),

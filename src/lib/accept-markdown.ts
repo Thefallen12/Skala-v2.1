@@ -28,25 +28,25 @@ function parseAcceptHeader(header: string): AcceptMediaRange[] {
 }
 
 /**
- * Returns true when an HTTP client explicitly prefers `text/markdown`
- * (for example AI agents performing Markdown content negotiation) rather
- * than a standard browser `Accept: text/html,...` request.
+ * Returns true when an HTTP client explicitly includes `text/markdown` or
+ * `text/x-markdown` with q > 0 in its `Accept` header (typical for AI agents
+ * and readiness scanners requesting Markdown representations, whereas standard
+ * browsers never include `text/markdown`).
  */
 export function isMarkdownPreferred(acceptHeader: string | null | undefined): boolean {
   if (!acceptHeader) return false;
   const normalized = acceptHeader.toLowerCase();
-  if (!normalized.includes("text/markdown")) return false;
+  if (!normalized.includes("text/markdown") && !normalized.includes("text/x-markdown")) {
+    return false;
+  }
 
   const ranges = parseAcceptHeader(acceptHeader);
-  const markdownRange = ranges.find((entry) => entry.type === "text/markdown");
+  const markdownRange = ranges.find(
+    (entry) => entry.type === "text/markdown" || entry.type === "text/x-markdown",
+  );
   if (!markdownRange || markdownRange.q <= 0) {
     return false;
   }
 
-  const htmlRange = ranges.find((entry) => entry.type === "text/html");
-  if (!htmlRange) {
-    return true;
-  }
-
-  return markdownRange.q >= htmlRange.q;
+  return true;
 }

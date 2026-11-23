@@ -1,13 +1,23 @@
 import type { MetadataRoute } from "next";
 import { PUBLIC_PAGES, absoluteUrl } from "@/lib/site-config";
 
-const STATIC_LAST_MODIFIED = new Date("2026-11-17T00:00:00.000Z");
+export const revalidate = 3600;
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return PUBLIC_PAGES.map((page) => ({
+  const lastModified = new Date();
+  const entries: MetadataRoute.Sitemap = PUBLIC_PAGES.map((page) => ({
     url: absoluteUrl(page.path),
-    lastModified: STATIC_LAST_MODIFIED,
+    lastModified,
     changeFrequency: page.changeFrequency,
     priority: page.priority,
   }));
+
+  entries.push({
+    url: absoluteUrl("/verify"),
+    lastModified,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  });
+
+  return entries;
 }

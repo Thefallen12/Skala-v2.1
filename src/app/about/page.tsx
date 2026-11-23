@@ -2,20 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Building2, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { JsonLdScript } from "@/components/public/JsonLdScript";
 import { PublicSiteChrome } from "@/components/public/PublicSiteChrome";
 import {
   COMPANY_PROFILE,
-  PUBLIC_PAGES,
   absoluteUrl,
   buildSubpageJsonLd,
+  getPublicPageMeta,
 } from "@/lib/site-config";
 
-const PAGE_META = PUBLIC_PAGES[1];
+const PAGE_META = getPublicPageMeta("/about");
 
 export const metadata: Metadata = {
-  title: PAGE_META.title,
+  title: { absolute: PAGE_META.title },
   description: PAGE_META.description,
   alternates: {
     canonical: absoluteUrl("/about"),
@@ -95,9 +95,9 @@ export default function AboutPage() {
                 <CardHeader className="pb-2">
                   <div className="mb-1 flex items-center gap-2 text-[#102A4D] dark:text-sky-300">
                     <CheckCircle2 className="size-4" aria-hidden="true" />
-                    <CardTitle className="type-h3 text-slate-950 dark:text-white">
+                    <h3 className="type-h3 font-semibold text-slate-950 dark:text-white">
                       {pillar.title}
-                    </CardTitle>
+                    </h3>
                   </div>
                 </CardHeader>
                 <CardContent>

@@ -20,6 +20,30 @@ const deploymentId = deploymentIdSource
     .replace(/[^A-Za-z0-9_-]+/g, "-")
     .replace(/^[-_]+|[-_]+$/g, "");
 
+const AGENT_DISCOVERY_LINK_HEADER = [
+    '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"',
+    '</.well-known/mcp/server-card.json>; rel="service-desc"; type="application/json"',
+    '</llms.txt>; rel="service-doc"; type="text/plain"',
+    '</llms.txt>; rel="describedby"; type="text/plain"',
+    '</api/markdown?path=/>; rel="alternate"; type="text/markdown"',
+    '</sitemap.xml>; rel="sitemap"; type="application/xml"',
+].join(", ");
+
+const PUBLIC_AGENT_HEADERS = [
+    {
+        key: "Link",
+        value: AGENT_DISCOVERY_LINK_HEADER,
+    },
+    {
+        key: "Content-Signal",
+        value: "search=yes, ai-input=yes, ai-train=no",
+    },
+    {
+        key: "Vary",
+        value: "Accept",
+    },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: "standalone",
@@ -38,6 +62,18 @@ const nextConfig = {
         remotePatterns: [
             { protocol: "https", hostname: "res.cloudinary.com", pathname: "/**" }
         ]
+    },
+    async headers() {
+        return [
+            {
+                source: "/",
+                headers: PUBLIC_AGENT_HEADERS,
+            },
+            {
+                source: "/:path(about|pricing|contact|terms|privacy|verify)",
+                headers: PUBLIC_AGENT_HEADERS,
+            },
+        ];
     },
     experimental: {
         cpus: 2,

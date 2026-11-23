@@ -20,12 +20,19 @@ export interface WebMcpToolResult {
   }>;
 }
 
+export interface WebMcpToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+}
+
 export interface WebMcpToolDefinition<
   TInput extends Record<string, unknown> = Record<string, unknown>,
 > {
   name: string;
   description: string;
   inputSchema: WebMcpToolInputSchema;
+  annotations?: WebMcpToolAnnotations;
   execute: (
     input: TInput,
     client?: {

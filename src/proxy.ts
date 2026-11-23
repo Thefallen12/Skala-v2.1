@@ -17,17 +17,21 @@ import { createMarkdownResponse } from "@/lib/public-markdown";
 const PUBLIC_INFO_PATHS = new Set([
   "/",
   "/about",
+  "/pricing",
   "/contact",
   "/terms",
   "/privacy",
+  "/verify",
 ]);
 
 const MARKDOWN_NEGOTIABLE_PATHS = new Set([
   "/",
   "/about",
+  "/pricing",
   "/contact",
   "/terms",
   "/privacy",
+  "/verify",
   "/auth/login",
 ]);
 
@@ -120,6 +124,14 @@ const authMiddleware = authForProxy((request, event: NextFetchEvent) => {
   if (PUBLIC_INFO_PATHS.has(pathname)) {
     const response = NextResponse.next();
     response.headers.set("Vary", "Accept");
+    response.headers.set(
+      "Content-Signal",
+      "search=yes, ai-input=yes, ai-train=no",
+    );
+    response.headers.append(
+      "Link",
+      '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json", </.well-known/mcp/server-card.json>; rel="service-desc"; type="application/json", </llms.txt>; rel="service-doc"; type="text/plain", </llms.txt>; rel="describedby"; type="text/plain", </api/markdown?path=/>; rel="alternate"; type="text/markdown", </sitemap.xml>; rel="sitemap"; type="application/xml"',
+    );
     return response;
   }
 
@@ -190,9 +202,11 @@ export const config = {
   matcher: [
     "/",
     "/about",
+    "/pricing",
     "/contact",
     "/terms",
     "/privacy",
+    "/verify",
     "/login",
     "/auth/login",
     "/auth/register",

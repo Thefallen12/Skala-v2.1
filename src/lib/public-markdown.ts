@@ -1,21 +1,40 @@
-import { COMPANY_PROFILE, PUBLIC_PAGES, SITE_URL, absoluteUrl } from "@/lib/site-config";
+import {
+  COMPANY_PROFILE,
+  SERVICE_PACKAGES,
+  SITE_URL,
+  absoluteUrl,
+  getPublicPageMeta,
+} from "@/lib/site-config";
 
 const FOOTER_LINKS_MD = [
   `- [Beranda](${absoluteUrl("/")})`,
   `- [Tentang Perusahaan](${absoluteUrl("/about")})`,
+  `- [Harga & Paket Layanan](${absoluteUrl("/pricing")})`,
   `- [Kontak](${absoluteUrl("/contact")})`,
   `- [Syarat dan Ketentuan](${absoluteUrl("/terms")})`,
   `- [Kebijakan Privasi](${absoluteUrl("/privacy")})`,
+  `- [Verifikasi Dokumen QR](${absoluteUrl("/verify")})`,
   `- [Portal Masuk Staf](${absoluteUrl("/auth/login")})`,
   `- [llms.txt](${absoluteUrl("/llms.txt")})`,
+  `- [llms-full.txt](${absoluteUrl("/llms-full.txt")})`,
   `- [MCP Server Card](${absoluteUrl("/.well-known/mcp/server-card.json")})`,
+  `- [API Catalog (RFC 9727)](${absoluteUrl("/.well-known/api-catalog")})`,
+].join("\n");
+
+const PRICING_TABLE_MD = [
+  "| Paket Layanan | Kategori | Harga (IDR) | Keterangan |",
+  "| --- | --- | --- | --- |",
+  ...SERVICE_PACKAGES.map(
+    (pkg) =>
+      `| ${pkg.name} | ${pkg.category} | ${pkg.priceDisplay} ${pkg.billingUnit} | ${pkg.description} |`,
+  ),
 ].join("\n");
 
 const MARKDOWN_PAGES: Record<string, string> = {
   "/": [
     `# ${COMPANY_PROFILE.legalName}`,
     "",
-    `> ${COMPANY_PROFILE.description}`,
+    `> ${getPublicPageMeta("/").description}`,
     "",
     `**Canonical URL**: ${absoluteUrl("/")}`,
     `**Tagline**: ${COMPANY_PROFILE.tagline} — ${COMPANY_PROFILE.motto}`,
@@ -26,6 +45,10 @@ const MARKDOWN_PAGES: Record<string, string> = {
     "2. **Logistik, Pengadaan Material Alam & Sewa**: Alur pengajuan tiket terstruktur dari tim lapangan ke logistik hingga pembayaran keuangan, Purchase Order, surat jalan armada, serta sewa rumah/kendaraan proyek.",
     "3. **Keuangan & Persetujuan Direksi**: Verifikasi tagihan vendor, arus kas proyek, pembayaran berjenjang, serta pembukuan realisasi terintegrasi.",
     "4. **Verifikasi Dokumen Digital QR**: Validasi keaslian Purchase Order, Surat Jalan, dan kontrak konstruksi melalui tautan publik `/verify/{kode}`.",
+    "",
+    "## Harga & Paket Layanan (Pricing)",
+    "",
+    PRICING_TABLE_MD,
     "",
     "## Akses Portal & Aplikasi",
     "",
@@ -48,7 +71,7 @@ const MARKDOWN_PAGES: Record<string, string> = {
   "/about": [
     `# Tentang ${COMPANY_PROFILE.legalName}`,
     "",
-    `> ${PUBLIC_PAGES[1].description}`,
+    `> ${getPublicPageMeta("/about").description}`,
     "",
     `**Canonical URL**: ${absoluteUrl("/about")}`,
     "",
@@ -70,10 +93,39 @@ const MARKDOWN_PAGES: Record<string, string> = {
     FOOTER_LINKS_MD,
   ].join("\n"),
 
+  "/pricing": [
+    `# Harga & Paket Layanan — ${COMPANY_PROFILE.legalName}`,
+    "",
+    `> ${getPublicPageMeta("/pricing").description}`,
+    "",
+    `**Canonical URL**: ${absoluteUrl("/pricing")}`,
+    "",
+    "## Daftar Harga Resmi (IDR)",
+    "",
+    PRICING_TABLE_MD,
+    "",
+    "## Rincian Fitur per Paket",
+    "",
+    ...SERVICE_PACKAGES.flatMap((pkg) => [
+      `### ${pkg.name} — ${pkg.priceDisplay} (${pkg.billingUnit})`,
+      "",
+      pkg.description,
+      "",
+      ...pkg.features.map((feat) => `- ${feat}`),
+      "",
+    ]),
+    "## Hubungi Penjualan & Konsultasi",
+    "",
+    `- **Email**: [${COMPANY_PROFILE.email}](mailto:${COMPANY_PROFILE.email})`,
+    `- **Telepon**: [${COMPANY_PROFILE.telephoneDisplay}](tel:${COMPANY_PROFILE.telephone})`,
+    "",
+    FOOTER_LINKS_MD,
+  ].join("\n"),
+
   "/contact": [
     `# Kontak Resmi ${COMPANY_PROFILE.legalName}`,
     "",
-    `> ${PUBLIC_PAGES[2].description}`,
+    `> ${getPublicPageMeta("/contact").description}`,
     "",
     `**Canonical URL**: ${absoluteUrl("/contact")}`,
     "",
@@ -97,7 +149,7 @@ const MARKDOWN_PAGES: Record<string, string> = {
   "/terms": [
     `# Syarat dan Ketentuan Layanan — ${COMPANY_PROFILE.legalName}`,
     "",
-    `> ${PUBLIC_PAGES[3].description}`,
+    `> ${getPublicPageMeta("/terms").description}`,
     "",
     `**Canonical URL**: ${absoluteUrl("/terms")}`,
     "",
@@ -112,7 +164,7 @@ const MARKDOWN_PAGES: Record<string, string> = {
     "",
     "## 3. Kebijakan Crawler & Penggunaan Agen AI",
     "",
-    "- Halaman publik (/ , /about, /contact, /terms, /privacy) serta endpoint penemuan (/llms.txt, /.well-known/mcp/server-card.json) diperbolehkan untuk pengindeksan pencarian dan grounding AI secara real-time (`search=yes, ai-input=yes`).",
+    "- Halaman publik (/, /about, /pricing, /contact, /terms, /privacy, /verify) serta endpoint penemuan (/llms.txt, /.well-known/mcp/server-card.json) diperbolehkan untuk pengindeksan pencarian dan grounding AI secara real-time (`search=yes, ai-input=yes`).",
     "- Konten situs tidak diizinkan untuk pelatihan ulang model AI tanpa persetujuan tertulis (`ai-train=no`).",
     "",
     "## 4. Kontak Pertanyaan Hukum",
@@ -125,7 +177,7 @@ const MARKDOWN_PAGES: Record<string, string> = {
   "/privacy": [
     `# Kebijakan Privasi — ${COMPANY_PROFILE.legalName}`,
     "",
-    `> ${PUBLIC_PAGES[4].description}`,
+    `> ${getPublicPageMeta("/privacy").description}`,
     "",
     `**Canonical URL**: ${absoluteUrl("/privacy")}`,
     "",
@@ -145,6 +197,17 @@ const MARKDOWN_PAGES: Record<string, string> = {
     FOOTER_LINKS_MD,
   ].join("\n"),
 
+  "/verify": [
+    `# Verifikasi Dokumen Digital QR — ${COMPANY_PROFILE.legalName}`,
+    "",
+    `> Portal publik untuk memeriksa keaslian Purchase Order, Invoice, Surat Jalan, dan Kontrak Kerja ${COMPANY_PROFILE.legalName}.`,
+    "",
+    `- **Format URL Verifikasi**: \`${SITE_URL}/verify/{kode}\``,
+    `- **Gratis tanpa login**: Ya (Rp 0)`,
+    "",
+    FOOTER_LINKS_MD,
+  ].join("\n"),
+
   "/auth/login": [
     `# Masuk ke Portal ${COMPANY_PROFILE.legalName}`,
     "",
@@ -159,10 +222,16 @@ const MARKDOWN_PAGES: Record<string, string> = {
   ].join("\n"),
 };
 
+export const PUBLIC_MARKDOWN_PATHS = Object.keys(MARKDOWN_PAGES);
+
 export function getPublicMarkdownForPath(pathname: string): string | null {
   const normalized =
     pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
   return MARKDOWN_PAGES[normalized] ?? null;
+}
+
+export function getAllPublicMarkdownCombined(): string {
+  return PUBLIC_MARKDOWN_PATHS.map((path) => MARKDOWN_PAGES[path]).join("\n\n---\n\n");
 }
 
 export function estimateMarkdownTokens(markdown: string): number {
@@ -179,7 +248,8 @@ export function createMarkdownResponse(pathname: string): Response | null {
       "Content-Type": "text/markdown; charset=utf-8",
       Vary: "Accept",
       "X-Markdown-Tokens": String(estimateMarkdownTokens(markdown)),
-      Link: `<${absoluteUrl("/llms.txt")}>; rel="alternate"; type="text/plain"`,
+      "Content-Signal": "search=yes, ai-input=yes, ai-train=no",
+      Link: `<${absoluteUrl("/llms.txt")}>; rel="service-doc"; type="text/plain", <${absoluteUrl("/.well-known/mcp/server-card.json")}>; rel="service-desc"; type="application/json", <${absoluteUrl("/sitemap.xml")}>; rel="sitemap"; type="application/xml"`,
       "Cache-Control": "public, max-age=300",
       "X-Content-Type-Options": "nosniff",
     },

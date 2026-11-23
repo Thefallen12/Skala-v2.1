@@ -1,6 +1,7 @@
 import {
   COMPANY_PROFILE,
   PUBLIC_PAGES,
+  SERVICE_PACKAGES,
   SITE_URL,
   absoluteUrl,
 } from "@/lib/site-config";
@@ -19,6 +20,16 @@ export const MCP_PUBLIC_TOOLS = [
     name: "get_company_profile",
     description:
       "Retrieve official profile, location, email, telephone, services, and external links for PT Skala Prioritas Engineering.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_service_pricing",
+    description:
+      "Retrieve transparent pricing packages in IDR for PT Skala Prioritas Engineering QR verification, ERP cloud license, and project management services.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -61,10 +72,31 @@ export const MCP_PUBLIC_RESOURCES = [
     mimeType: "application/json",
   },
   {
+    uri: "skala://company/pricing",
+    name: "PT Skala Prioritas Engineering Service Pricing",
+    description: "Public IDR service pricing catalog and package features.",
+    mimeType: "application/json",
+  },
+  {
     uri: "skala://public/overview",
     name: "Skala Prioritas Homepage Markdown",
-    description: "Markdown overview of skala-prioritas.com services and links.",
+    description: "Markdown overview of skala-prioritas.com services, pricing, and links.",
     mimeType: "text/markdown",
+  },
+] as const;
+
+export const MCP_PUBLIC_PROMPTS = [
+  {
+    name: "verify_company_and_document",
+    description:
+      "Summarize PT Skala Prioritas Engineering company identity and verify an official QR document code.",
+    arguments: [
+      {
+        name: "documentCode",
+        description: "Optional Purchase Order, Delivery Order, or Invoice QR code.",
+        required: false,
+      },
+    ],
   },
 ] as const;
 
@@ -76,7 +108,7 @@ export function buildMcpServerCard() {
     name: MCP_SERVER_INFO.name,
     title: MCP_SERVER_INFO.title,
     description:
-      "Public Model Context Protocol server for PT Skala Prioritas Engineering company metadata, public navigation discovery, and QR document verification links.",
+      "Public Model Context Protocol server for PT Skala Prioritas Engineering company metadata, IDR service pricing, public navigation discovery, and QR document verification links.",
     endpoint: absoluteUrl("/api/mcp"),
     serverInfo: {
       name: MCP_SERVER_INFO.name,
@@ -94,11 +126,12 @@ export function buildMcpServerCard() {
     },
     tools: MCP_PUBLIC_TOOLS,
     resources: MCP_PUBLIC_RESOURCES,
+    prompts: MCP_PUBLIC_PROMPTS,
     documentationUrl: absoluteUrl("/llms.txt"),
     authentication: {
       required: false,
       notes:
-        "Public discovery and verification URL tools require no authentication. Internal ERP operational modules require authenticated staff credentials.",
+        "Public discovery, pricing, and verification URL tools require no authentication. Internal ERP operational modules require authenticated staff credentials.",
     },
   };
 }
@@ -137,6 +170,24 @@ export function executePublicMcpTool(
         ],
       };
 
+    case "get_service_pricing":
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                currency: "IDR",
+                pricingUrl: absoluteUrl("/pricing"),
+                packages: SERVICE_PACKAGES,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+
     case "list_public_pages":
       return {
         content: [
@@ -152,6 +203,10 @@ export function executePublicMcpTool(
                   robots: absoluteUrl("/robots.txt"),
                   sitemap: absoluteUrl("/sitemap.xml"),
                   llms: absoluteUrl("/llms.txt"),
+                  llmsFull: absoluteUrl("/llms-full.txt"),
+                  apiCatalog: absoluteUrl("/.well-known/api-catalog"),
+                  agentCard: absoluteUrl("/.well-known/agent-card.json"),
+                  agentSkills: absoluteUrl("/.well-known/agent-skills/index.json"),
                   mcpServerCard: absoluteUrl("/.well-known/mcp/server-card.json"),
                   mcpEndpoint: absoluteUrl("/api/mcp"),
                   login: absoluteUrl("/auth/login"),
@@ -208,6 +263,22 @@ export function readPublicMcpResource(uri: string) {
           uri,
           mimeType: "application/json",
           text: JSON.stringify(COMPANY_PROFILE, null, 2),
+        },
+      ],
+    };
+  }
+
+  if (uri === "skala://company/pricing") {
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "application/json",
+          text: JSON.stringify(
+            { currency: "IDR", url: absoluteUrl("/pricing"), packages: SERVICE_PACKAGES },
+            null,
+            2,
+          ),
         },
       ],
     };

@@ -7,16 +7,16 @@ import { JsonLdScript } from "@/components/public/JsonLdScript";
 import { PublicSiteChrome } from "@/components/public/PublicSiteChrome";
 import {
   COMPANY_PROFILE,
-  PUBLIC_PAGES,
   SITE_URL,
   absoluteUrl,
   buildSubpageJsonLd,
+  getPublicPageMeta,
 } from "@/lib/site-config";
 
-const PAGE_META = PUBLIC_PAGES[2];
+const PAGE_META = getPublicPageMeta("/contact");
 
 export const metadata: Metadata = {
-  title: PAGE_META.title,
+  title: { absolute: PAGE_META.title },
   description: PAGE_META.description,
   alternates: {
     canonical: absoluteUrl("/contact"),
@@ -53,6 +53,7 @@ export default function ContactPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <address className="not-italic space-y-4">
               <div className="flex items-start gap-3">
                 <Mail className="mt-1 size-5 shrink-0 text-[#102A4D] dark:text-sky-300" aria-hidden="true" />
                 <div>
@@ -117,6 +118,7 @@ export default function ContactPage() {
                   </p>
                 </div>
               </div>
+              </address>
             </CardContent>
           </Card>
 

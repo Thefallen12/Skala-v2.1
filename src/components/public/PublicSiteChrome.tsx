@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Building2, LogIn, Mail, MapPin, Phone } from "lucide-react";
+import { Building2, ExternalLink, LogIn, Mail, MapPin, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { COMPANY_PROFILE } from "@/lib/site-config";
 import { WebMcpProvider } from "@/components/public/WebMcpProvider";
@@ -10,20 +10,23 @@ export function PublicSiteChrome({
   activePath,
   children,
 }: {
-  activePath: "/" | "/about" | "/contact" | "/terms" | "/privacy";
+  activePath: "/" | "/about" | "/pricing" | "/contact" | "/terms" | "/privacy";
   children: ReactNode;
 }) {
   const navLinks = [
     { href: "/", label: "Beranda" },
     { href: "/about", label: "Tentang" },
+    { href: "/pricing", label: "Harga" },
     { href: "/contact", label: "Kontak" },
   ] as const;
 
   const legalLinks = [
     { href: "/about", label: "Tentang Kami" },
-    { href: "/contact", label: "Kontak" },
+    { href: "/pricing", label: "Harga & Paket" },
+    { href: "/contact", label: "Kontak Resmi" },
     { href: "/terms", label: "Syarat & Ketentuan" },
     { href: "/privacy", label: "Kebijakan Privasi" },
+    { href: "/verify", label: "Verifikasi QR" },
     { href: "/auth/login", label: "Masuk Portal" },
   ] as const;
 
@@ -92,7 +95,7 @@ export function PublicSiteChrome({
           aria-label="Navigasi cepat mobile"
           className="flex items-center gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 sm:hidden dark:border-slate-800"
         >
-          {legalLinks.slice(0, 4).map((item) => {
+          {legalLinks.slice(0, 5).map((item) => {
             const isActive = activePath === item.href;
             return (
               <Link
@@ -118,7 +121,7 @@ export function PublicSiteChrome({
 
       <footer className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-8 sm:px-6 md:grid-cols-3">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-bold text-[#102A4D] dark:text-white">
               <Building2 className="size-4 shrink-0" aria-hidden="true" />
               <span>{COMPANY_PROFILE.legalName}</span>
@@ -126,38 +129,68 @@ export function PublicSiteChrome({
             <p className="type-p2 text-slate-600 dark:text-slate-400">
               {COMPANY_PROFILE.description}
             </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {COMPANY_PROFILE.externalProfiles.map((profile) => (
+                <a
+                  key={profile.url}
+                  href={profile.url}
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 transition hover:border-[#102A4D] hover:text-[#102A4D] dark:border-slate-700 dark:text-slate-300 dark:hover:text-white"
+                >
+                  {profile.label}
+                  <ExternalLink className="size-3" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-2">
-            <p className="type-h3 text-slate-900 dark:text-white">Kontak Resmi</p>
-            <ul className="space-y-1.5 type-p2 text-slate-700 dark:text-slate-300">
-              <li className="flex items-center gap-2">
-                <Mail className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                <a
-                  href={`mailto:${COMPANY_PROFILE.email}`}
-                  className="underline decoration-slate-300 underline-offset-4 hover:text-[#102A4D] dark:hover:text-white"
+            <div className="type-h3 font-semibold text-slate-900 dark:text-white">
+              Kontak Resmi
+            </div>
+            <address className="not-italic">
+              <ul className="space-y-1.5 type-p2 text-slate-700 dark:text-slate-300">
+                <li className="flex items-center gap-2">
+                  <Mail className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  <a
+                    href={`mailto:${COMPANY_PROFILE.email}`}
+                    className="underline decoration-slate-300 underline-offset-4 hover:text-[#102A4D] dark:hover:text-white"
+                  >
+                    {COMPANY_PROFILE.email}
+                  </a>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Phone className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  <a
+                    href={`tel:${COMPANY_PROFILE.telephone}`}
+                    className="underline decoration-slate-300 underline-offset-4 hover:text-[#102A4D] dark:hover:text-white"
+                  >
+                    {COMPANY_PROFILE.telephoneDisplay}
+                  </a>
+                </li>
+                <li
+                  className="flex items-start gap-2"
+                  itemScope
+                  itemType="https://schema.org/PostalAddress"
                 >
-                  {COMPANY_PROFILE.email}
-                </a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                <a
-                  href={`tel:${COMPANY_PROFILE.telephone}`}
-                  className="underline decoration-slate-300 underline-offset-4 hover:text-[#102A4D] dark:hover:text-white"
-                >
-                  {COMPANY_PROFILE.telephoneDisplay}
-                </a>
-              </li>
-              <li className="flex items-start gap-2">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                <span>{COMPANY_PROFILE.addressDisplay}</span>
-              </li>
-            </ul>
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  <span>
+                    <span itemProp="streetAddress">{COMPANY_PROFILE.address.streetAddress}</span>,{" "}
+                    <span itemProp="addressLocality">{COMPANY_PROFILE.address.addressLocality}</span>,{" "}
+                    <span itemProp="addressRegion">{COMPANY_PROFILE.address.addressRegion}</span>{" "}
+                    <span itemProp="postalCode">{COMPANY_PROFILE.address.postalCode}</span>,{" "}
+                    <span itemProp="addressCountry">{COMPANY_PROFILE.address.addressCountry}</span>
+                  </span>
+                </li>
+              </ul>
+            </address>
           </div>
 
           <div className="space-y-2">
-            <p className="type-h3 text-slate-900 dark:text-white">Informasi &amp; Legal</p>
+            <div className="type-h3 font-semibold text-slate-900 dark:text-white">
+              Informasi, Harga &amp; Agen AI
+            </div>
             <nav aria-label="Tautan informasi dan legal" className="grid grid-cols-2 gap-x-4 gap-y-1.5 type-p2">
               {legalLinks.map((item) => (
                 <Link
@@ -179,6 +212,12 @@ export function PublicSiteChrome({
                 className="text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-[#102A4D] dark:text-slate-300 dark:hover:text-white"
               >
                 MCP Server Card
+              </a>
+              <a
+                href="/.well-known/api-catalog"
+                className="text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-[#102A4D] dark:text-slate-300 dark:hover:text-white"
+              >
+                API Catalog
               </a>
             </nav>
           </div>
