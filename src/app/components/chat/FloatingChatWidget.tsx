@@ -1177,6 +1177,10 @@ export default function FloatingChatWidget({
 
   const totalUnread = bootstrap?.totalUnread ?? 0;
   const gatewayOnline = hermesStatus?.gatewayOnline ?? false;
+  const isGeminiGateway = Boolean(
+    gatewayOnline &&
+      hermesStatus?.gatewayUrl?.includes("generativelanguage.googleapis.com"),
+  );
   const cliInstallCommands =
     hermesStatus?.installCommands?.length
       ? hermesStatus.installCommands
@@ -1339,17 +1343,27 @@ export default function FloatingChatWidget({
     setTestingGateway(true);
 
     try {
+      const headers: Record<string, string> = {};
+      if (cleanedKey) {
+        headers["x-hermes-api-key"] = cleanedKey;
+      }
       const status = await fetchJson<HermesStatusResponse>(
         `/api/chat/hermes/status?gatewayUrl=${encodeURIComponent(cleanedUrl)}`,
+        { headers },
       );
       await mutateHermesStatus(status, false);
       if (status.gatewayOnline) {
+        const isGemini = status.gatewayUrl.includes(
+          "generativelanguage.googleapis.com",
+        );
         toast.success(
-          `Terhubung ke Hermes Gateway (${status.model ?? "Aktif"})`,
+          isGemini
+            ? `Terhubung ke Gemini API (${status.model ?? "Aktif"})`
+            : `Terhubung ke Hermes Gateway (${status.model ?? "Aktif"})`,
         );
       } else {
         toast.info(
-          "Gateway CLI lokal tidak aktif — Built-in Hermes ERP Engine siap digunakan.",
+          "Gateway CLI lokal & Gemini API belum aktif — Built-in Hermes ERP Engine siap digunakan.",
         );
       }
     } catch (error) {
@@ -2188,9 +2202,11 @@ export default function FloatingChatWidget({
             />
             <div className="min-w-0">
               <p className="truncate text-[11px] font-bold text-foreground">
-                {gatewayOnline
-                  ? `Gateway CLI Aktif${hermesStatus?.model ? ` · ${hermesStatus.model}` : ""}`
-                  : "Built-in Hermes ERP Engine Aktif"}
+                {isGeminiGateway
+                  ? `Gemini API Aktif${hermesStatus?.model ? ` · ${hermesStatus.model}` : ""}`
+                  : gatewayOnline
+                    ? `Gateway CLI Aktif${hermesStatus?.model ? ` · ${hermesStatus.model}` : ""}`
+                    : "Built-in Hermes ERP Engine Aktif"}
               </p>
               <p className="truncate text-[10px] text-muted-foreground">
                 {hermesStatus?.detail ||
@@ -2247,11 +2263,21 @@ export default function FloatingChatWidget({
                 variant={gatewayOnline ? "lightSuccess" : "lightWarning"}
                 className="px-2 py-0.5 text-[10px]"
               >
-                {gatewayOnline ? "Gateway Terhubung" : "Mode Fallback ERP"}
+                {isGeminiGateway
+                  ? "Gemini API Aktif"
+                  : gatewayOnline
+                    ? "Gateway Terhubung"
+                    : "Mode Fallback ERP"}
               </Badge>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSaveAndTestGateway();
+              }}
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+            >
               <div>
                 <label
                   htmlFor="hermes-gateway-url"
@@ -2279,9 +2305,10 @@ export default function FloatingChatWidget({
                   <Input
                     id="hermes-api-key"
                     type={showApiKey ? "text" : "password"}
+                    autoComplete="off"
                     value={apiKeyInput}
                     onChange={(event) => setApiKeyInput(event.target.value)}
-                    placeholder="Bearer / Hermes API key"
+                    placeholder="Bearer / Hermes / Gemini API key"
                     className="h-8 bg-background pr-8 font-mono text-xs"
                   />
                   <button
@@ -2302,7 +2329,7 @@ export default function FloatingChatWidget({
                   </button>
                 </div>
               </div>
-            </div>
+            </form>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] text-muted-foreground">
@@ -2378,14 +2405,21 @@ export default function FloatingChatWidget({
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-foreground">
+                <label
+                  htmlFor="hermes-doc-type"
+                  className="mb-1 block text-[11px] font-semibold text-foreground"
+                >
                   Jenis Dokumen
                 </label>
                 <Select
                   value={docType}
                   onValueChange={(value) => setDocType(value as HermesDocType)}
                 >
-                  <SelectTrigger size="sm" className="w-full bg-background text-xs">
+                  <SelectTrigger
+                    id="hermes-doc-type"
+                    size="sm"
+                    className="w-full bg-background text-xs"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="border border-border">
@@ -2399,11 +2433,18 @@ export default function FloatingChatWidget({
               </div>
 
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-foreground">
+                <label
+                  htmlFor="hermes-doc-project"
+                  className="mb-1 block text-[11px] font-semibold text-foreground"
+                >
                   Proyek Terkait (Opsional)
                 </label>
                 <Select value={docProjectId} onValueChange={setDocProjectId}>
-                  <SelectTrigger size="sm" className="w-full bg-background text-xs">
+                  <SelectTrigger
+                    id="hermes-doc-project"
+                    size="sm"
+                    className="w-full bg-background text-xs"
+                  >
                     <SelectValue placeholder="Pilih proyek" />
                   </SelectTrigger>
                   <SelectContent className="border border-border">
@@ -2456,11 +2497,18 @@ export default function FloatingChatWidget({
 
             {(bootstrap?.tickets.length ?? 0) > 0 && (
               <div>
-                <label className="mb-1 block text-[11px] font-semibold text-foreground">
+                <label
+                  htmlFor="hermes-doc-ticket"
+                  className="mb-1 block text-[11px] font-semibold text-foreground"
+                >
                   Tiket Terkait (Opsional)
                 </label>
                 <Select value={docTicketId} onValueChange={setDocTicketId}>
-                  <SelectTrigger size="sm" className="w-full bg-background text-xs">
+                  <SelectTrigger
+                    id="hermes-doc-ticket"
+                    size="sm"
+                    className="w-full bg-background text-xs"
+                  >
                     <SelectValue placeholder="Tanpa tiket spesifik" />
                   </SelectTrigger>
                   <SelectContent className="border border-border">
@@ -2547,6 +2595,11 @@ export default function FloatingChatWidget({
                 typeof message.metadata?.engineUsed === "string"
                   ? message.metadata.engineUsed
                   : null;
+              const msgIsGemini =
+                typeof message.metadata?.gatewayUrl === "string" &&
+                message.metadata.gatewayUrl.includes(
+                  "generativelanguage.googleapis.com",
+                );
 
               return (
                 <div
@@ -2584,7 +2637,9 @@ export default function FloatingChatWidget({
                           )}
                         >
                           {engineMeta === "hermes-gateway"
-                            ? "Gateway CLI"
+                            ? msgIsGemini
+                              ? "Gemini AI"
+                              : "Gateway CLI"
                             : "ERP Engine"}
                         </span>
                       </div>
@@ -2828,7 +2883,11 @@ export default function FloatingChatWidget({
                         : "bg-white/15 text-amber-200",
                   )}
                 >
-                  {gatewayOnline ? "Gateway CLI" : "ERP Engine"}
+                  {isGeminiGateway
+                    ? "Gemini AI"
+                    : gatewayOnline
+                      ? "Gateway CLI"
+                      : "ERP Engine"}
                 </span>
               </button>
             </div>

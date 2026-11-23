@@ -30,10 +30,13 @@ export const HERMES_INSTALL_COMMANDS: string[] = [
   "curl -fsSLO https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh",
   "less install.sh",
   "bash install.sh",
+  "hermes config set GEMINI_API_KEY \"$API_KEY_GEMINI\"",
   "hermes config set API_SERVER_ENABLED true",
   "hermes gateway",
 ];
 
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
 const DEFAULT_HERMES_GATEWAY_URL = "http://127.0.0.1:8642";
 const BLOCKED_METADATA_HOSTS = new Set([
   "169.254.169.254",
@@ -342,12 +345,131 @@ function resolveValidatedGatewayUrl(customGatewayUrl?: string | null): {
   }
 }
 
+function normalizeEnvSecret(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.trim().replace(/^["']|["']$/g, "");
+}
+
+export function resolveGeminiApiKey(customApiKey?: string | null): string {
+  const custom = normalizeEnvSecret(customApiKey);
+  if (custom && (/^AQ\./i.test(custom) || /^AIza/i.test(custom))) {
+    return custom;
+  }
+  return (
+    normalizeEnvSecret(process.env.API_KEY_GEMINI) ||
+    normalizeEnvSecret(process.env.GEMINI_API_KEY) ||
+    normalizeEnvSecret(process.env.GOOGLE_API_KEY)
+  );
+}
+
+function getGeminiModelCandidates(): string[] {
+  const configured = normalizeEnvSecret(process.env.GEMINI_MODEL);
+  const candidates = [
+    configured,
+    DEFAULT_GEMINI_MODEL,
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+  ].filter(Boolean);
+  return Array.from(new Set(candidates));
+}
+
+export async function callGeminiApi(params: {
+  apiKey: string;
+  systemPrompt: string;
+  history: Array<{ role: "user" | "assistant"; content: string }>;
+  message: string;
+}): Promise<string | null> {
+  const cleanKey = normalizeEnvSecret(params.apiKey);
+  const cleanMessage = params.message.trim();
+  if (!cleanKey || !cleanMessage) {
+    return null;
+  }
+
+  const contents = [
+    ...params.history
+      .map((turn) => ({
+        role: turn.role === "assistant" ? ("model" as const) : ("user" as const),
+        parts: [{ text: turn.content.slice(0, 2000).trim() }],
+      }))
+      .filter((turn) => turn.parts[0].text.length > 0),
+    {
+      role: "user" as const,
+      parts: [{ text: cleanMessage }],
+    },
+  ];
+
+  const models = getGeminiModelCandidates();
+  for (const model of models) {
+    try {
+      const endpoint = `${GEMINI_API_BASE_URL}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: params.systemPrompt }],
+          },
+          contents,
+          generationConfig: {
+            temperature: 0.3,
+          },
+        }),
+        signal: AbortSignal.timeout(10000),
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const payload = (await response.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{ text?: string | null }>;
+          };
+        }>;
+      };
+      const text = payload?.candidates?.[0]?.content?.parts
+        ?.map((part) => (typeof part?.text === "string" ? part.text : ""))
+        .join("")
+        .trim();
+      if (text) {
+        return text;
+      }
+    } catch {
+      // Lanjut ke model fallback berikutnya bila timeout / error jaringan.
+    }
+  }
+
+  return null;
+}
+
+function buildGeminiOnlineStatus(): HermesGatewayStatus {
+  const model = getGeminiModelCandidates()[0] ?? DEFAULT_GEMINI_MODEL;
+  return {
+    gatewayOnline: true,
+    gatewayUrl: GEMINI_API_BASE_URL,
+    model,
+    engineMode: "hermes-gateway",
+    detail:
+      "Hermes Assistant terhubung ke Google Gemini API (API_KEY_GEMINI aktif) + Live Database Skala ERP.",
+    installCommands: HERMES_INSTALL_COMMANDS,
+  };
+}
+
 export async function checkHermesGatewayStatus(
   customGatewayUrl?: string | null,
   customApiKey?: string | null,
 ): Promise<HermesGatewayStatus> {
+  const geminiKey = resolveGeminiApiKey(customApiKey);
   const resolved = resolveValidatedGatewayUrl(customGatewayUrl);
   if (!resolved.valid) {
+    if (geminiKey) {
+      return buildGeminiOnlineStatus();
+    }
     return {
       gatewayOnline: false,
       gatewayUrl: resolved.url,
@@ -358,8 +480,12 @@ export async function checkHermesGatewayStatus(
     };
   }
 
+  if (resolved.url.includes("generativelanguage.googleapis.com") && geminiKey) {
+    return buildGeminiOnlineStatus();
+  }
+
   const apiKey =
-    customApiKey?.trim() || process.env.HERMES_API_KEY?.trim() || "";
+    normalizeEnvSecret(customApiKey) || normalizeEnvSecret(process.env.HERMES_API_KEY);
   const headers: Record<string, string> = { Accept: "application/json" };
   if (apiKey) {
     headers.Authorization = `Bearer ${apiKey}`;
@@ -398,6 +524,9 @@ export async function checkHermesGatewayStatus(
     }
 
     if (modelsRes.status === 401 || modelsRes.status === 403) {
+      if (geminiKey) {
+        return buildGeminiOnlineStatus();
+      }
       return {
         gatewayOnline: false,
         gatewayUrl: resolved.url,
@@ -427,6 +556,10 @@ export async function checkHermesGatewayStatus(
       }
     }
 
+    if (geminiKey) {
+      return buildGeminiOnlineStatus();
+    }
+
     return {
       gatewayOnline: false,
       gatewayUrl: resolved.url,
@@ -436,6 +569,9 @@ export async function checkHermesGatewayStatus(
       installCommands: HERMES_INSTALL_COMMANDS,
     };
   } catch {
+    if (geminiKey) {
+      return buildGeminiOnlineStatus();
+    }
     return {
       gatewayOnline: false,
       gatewayUrl: resolved.url,
@@ -764,21 +900,8 @@ export async function callHermesGateway(
   input: CallHermesGatewayInput,
 ): Promise<string | null> {
   const resolved = resolveValidatedGatewayUrl(input.customGatewayUrl);
-  if (!resolved.valid) {
-    return null;
-  }
+  const geminiApiKey = resolveGeminiApiKey(input.customApiKey);
 
-  const apiKey =
-    input.customApiKey?.trim() || process.env.HERMES_API_KEY?.trim() || "";
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-  if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-
-  const model = process.env.HERMES_MODEL?.trim() || "hermes-agent";
   const systemPrompt = [
     "Anda adalah **Hermes Assistant untuk PT Skala Prioritas Engineering** — asisten eksekutif dan operasional untuk sistem ERP konstruksi, teknik sipil, manajemen proyek, logistik material, keuangan, dan administrasi kontrak.",
     "Jawablah dalam Bahasa Indonesia yang profesional, akurat, ringkas, dan terstruktur.",
@@ -799,34 +922,62 @@ export async function callHermesGateway(
       content: turn.content.slice(0, 2000),
     }));
 
-  try {
-    const response = await fetch(`${resolved.url}/v1/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        temperature: 0.3,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...historyMessages,
-          { role: "user", content: input.message },
-        ],
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
-
-    if (!response.ok) {
-      return null;
+  if (
+    resolved.valid &&
+    !resolved.url.includes("generativelanguage.googleapis.com")
+  ) {
+    const apiKey =
+      normalizeEnvSecret(input.customApiKey) ||
+      normalizeEnvSecret(process.env.HERMES_API_KEY);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
     }
 
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-    };
-    const reply = payload?.choices?.[0]?.message?.content?.trim();
-    return reply || null;
-  } catch {
-    return null;
+    const model = process.env.HERMES_MODEL?.trim() || "hermes-agent";
+    try {
+      const response = await fetch(`${resolved.url}/v1/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          temperature: 0.3,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...historyMessages,
+            { role: "user", content: input.message },
+          ],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+
+      if (response.ok) {
+        const payload = (await response.json()) as {
+          choices?: Array<{ message?: { content?: string | null } }>;
+        };
+        const reply = payload?.choices?.[0]?.message?.content?.trim();
+        if (reply) {
+          return reply;
+        }
+      }
+    } catch {
+      // Fallback otomatis ke Google Gemini API bila tersedia.
+    }
   }
+
+  if (geminiApiKey) {
+    return callGeminiApi({
+      apiKey: geminiApiKey,
+      systemPrompt,
+      history: historyMessages,
+      message: input.message,
+    });
+  }
+
+  return null;
 }
 
 const SATUAN = [

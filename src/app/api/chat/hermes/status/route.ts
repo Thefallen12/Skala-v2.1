@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
   }
 
   const gatewayUrl = request.nextUrl.searchParams.get("gatewayUrl");
-  const status = await checkHermesGatewayStatus(gatewayUrl);
+  const customApiKey = request.headers.get("x-hermes-api-key");
+  const status = await checkHermesGatewayStatus(gatewayUrl, customApiKey);
 
   return NextResponse.json(status, {
     headers: {

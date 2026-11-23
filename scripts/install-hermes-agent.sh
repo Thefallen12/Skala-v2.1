@@ -18,9 +18,13 @@ fi
 bash install.sh
 
 echo ""
-echo "Mengaktifkan OpenAI-compatible API Server Hermes di port 8642..."
+echo "Mengaktifkan konfigurasi Gemini API & OpenAI-compatible API Server Hermes di port 8642..."
 if command -v hermes >/dev/null 2>&1; then
+  if [ -n "${API_KEY_GEMINI:-${GEMINI_API_KEY:-}}" ]; then
+    hermes config set GEMINI_API_KEY "${API_KEY_GEMINI:-${GEMINI_API_KEY:-}}" || true
+  fi
   hermes config set API_SERVER_ENABLED true || true
   echo "Silakan set API key opsional dengan: hermes config set API_SERVER_KEY <rahasia>"
+  echo "Atau set Gemini key via: hermes config set GEMINI_API_KEY \"\$API_KEY_GEMINI\""
   echo "Lalu jalankan gateway: hermes gateway"
 fi
