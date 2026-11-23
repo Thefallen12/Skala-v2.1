@@ -22,6 +22,7 @@ import { MaintenanceProvider } from '@/components/maintenance/MaintenanceContext
 import { UnderProductionState } from '@/components/ui/under-production-state'
 import WhatsAppNotificationPopup from '@/app/components/notifications/WhatsAppNotificationPopup'
 import DevicePermissionsDialog from '@/app/components/notifications/DevicePermissionsDialog'
+import FloatingChatWidget from '@/app/components/chat/FloatingChatWidget'
 import {
   cancelNativeNotification,
   consumePendingNativeNotificationAction,
@@ -106,6 +107,7 @@ export default function DashboardLayoutClient({
   allowedMenuKeys,
   maintenancePageKeys,
   profilePhotoUrl,
+  userId = '',
   userName,
   userRole,
   notifications,
@@ -122,6 +124,7 @@ export default function DashboardLayoutClient({
   allowedMenuKeys: string[]
   maintenancePageKeys: string[]
   profilePhotoUrl: string | null
+  userId?: string
   userName: string
   userRole: UserRole
   notifications: DashboardNotification[]
@@ -562,6 +565,11 @@ export default function DashboardLayoutClient({
                 canAccessProjects={canAccessProjects}
                 canAccessDrafter={canAccessDrafter}
                 sidebarCounts={sidebarCounts}
+              />
+              <FloatingChatWidget
+                currentUserId={userId}
+                currentUserName={userName}
+                currentUserRole={userRole}
               />
             </div>
           </div>

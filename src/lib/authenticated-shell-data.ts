@@ -65,6 +65,7 @@ export async function loadAuthenticatedShellProps(sessionUser: {
     allowedMenuKeys,
     maintenancePageKeys,
     profilePhotoUrl: user.profilePhotoUrl,
+    userId: sessionUser.id,
     userName: sessionUser.name ?? "Pengguna",
     userRole: sessionUser.role,
     notifications,
