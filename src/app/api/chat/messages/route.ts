@@ -185,7 +185,7 @@ async function resolveAccessibleRoom(params: {
             unreadCounts: {},
           },
         },
-        { upsert: true, new: true },
+        { upsert: true, returnDocument: "after" },
       ).lean<ChatRoomDocument | null>();
 
       if (!created) {
@@ -332,7 +332,7 @@ export async function GET(request: NextRequest) {
     const updatedRoom = await ChatRoomModel.findByIdAndUpdate(
       resolution.room._id,
       { $set: { [`unreadCounts.${userId}`]: 0 } },
-      { new: true },
+      { returnDocument: "after" },
     ).lean<ChatRoomDocument | null>();
 
     const recentMessages = await ChatMessageModel.find({
@@ -507,7 +507,7 @@ export async function POST(request: NextRequest) {
     }
 
     const updatedRoom = await ChatRoomModel.findByIdAndUpdate(room._id, updateQuery, {
-      new: true,
+      returnDocument: "after",
     }).lean<ChatRoomDocument | null>();
 
     if (room.type === "DIRECT") {

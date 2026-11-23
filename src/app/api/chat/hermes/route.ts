@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
         lastMessageAt: new Date(),
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
   );
 
   const recentMessages = await ChatMessageModel.find({ roomId: roomDoc._id })
@@ -353,7 +353,7 @@ export async function POST(request: NextRequest) {
         lastMessageSenderName: "Hermes Assistant",
       },
     },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   const resolvedRoom = (updatedRoomDoc

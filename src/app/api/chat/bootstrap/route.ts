@@ -103,7 +103,7 @@ async function upsertRoomByKey(params: {
           unreadCounts: {},
         },
       },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: "after" },
     ).lean<ChatRoomDocument | null>();
 
     if (!doc) {
@@ -211,7 +211,6 @@ export async function GET() {
         roomId: String(ensuredHermesRoom._id),
       });
       if (existingMessages === 0) {
-        const welcomeTime = new Date();
         const welcomePreview =
           "Halo! Saya Hermes Assistant, siap bantu buat Kwitansi, SPK, BAST, PO, & Laporan.";
         await ChatMessageModel.findOneAndUpdate(
@@ -231,18 +230,16 @@ export async function GET() {
               attachments: [],
               metadata: { isWelcome: true, source: "system" },
               readByIds: [userId],
-              createdAt: welcomeTime,
-              updatedAt: welcomeTime,
             },
           },
-          { upsert: true, new: true },
+          { upsert: true, returnDocument: "after" },
         );
         await ChatRoomModel.findOneAndUpdate(
           { _id: ensuredHermesRoom._id, lastMessageText: null },
           {
             $set: {
               lastMessageText: welcomePreview,
-              lastMessageAt: welcomeTime,
+              lastMessageAt: new Date(),
               lastMessageSenderId: "hermes-assistant",
               lastMessageSenderName: "Hermes Assistant",
             },
